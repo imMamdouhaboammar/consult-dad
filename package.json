@@ -1,0 +1,58 @@
+{
+  "name": "consult-dad",
+  "version": "0.0.1",
+  "description": "Local escalation bridge for coding agents — consult a higher-trust advisor without surrendering control",
+  "type": "module",
+  "bin": {
+    "dad": "./dist/cli/index.js"
+  },
+  "main": "./dist/cli/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/imMamdouhaboammar/consult-dad.git"
+  },
+  "author": "Mamdouh Aboammar",
+  "files": [
+    "dist",
+    "skills",
+    "prompts",
+    "schemas",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "dad": "bun run src/cli/index.ts"
+  },
+  "keywords": [
+    "ai",
+    "agent",
+    "escalation",
+    "mcp",
+    "consultation",
+    "superpowers",
+    "staff-engineer"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "better-sqlite3": "^13.0.3",
+    "commander": "^15.0.0",
+    "ulid": "^3.0.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/bun": "^1.4.0",
+    "@types/node": "^26.4.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.3",
+    "vitest": "^4.1.11"
+  }
+}

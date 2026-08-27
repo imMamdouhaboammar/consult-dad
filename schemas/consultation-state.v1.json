@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://consult-dad.dev/schemas/consultation-state.v1.json",
+  "title": "ConsultationState",
+  "description": "Schema for complete lifecycle state of a consultation record",
+  "type": "object",
+  "properties": {
+    "consultation_id": {
+      "type": "string"
+    },
+    "context_id": {
+      "type": "string"
+    },
+    "advisor_id": {
+      "type": "string"
+    },
+    "native_session_id": {
+      "type": ["string", "null"]
+    },
+    "caller_id": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["consult", "diagnose", "review", "decide", "challenge", "takeover"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["created", "queued", "running", "input_required", "completed", "failed", "timed_out", "canceled"]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "request": {
+      "$ref": "./consultation-request.v1.json"
+    },
+    "answer": {
+      "oneOf": [
+        { "$ref": "./consultation-answer.v1.json" },
+        { "type": "null" }
+      ]
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "type": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          }
+        },
+        "required": ["timestamp", "type"],
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "errors": {
+      "type": "array",
+      "items": {},
+      "default": []
+    }
+  },
+  "required": [
+    "consultation_id",
+    "caller_id",
+    "mode",
+    "status",
+    "started_at",
+    "request"
+  ],
+  "additionalProperties": false
+}

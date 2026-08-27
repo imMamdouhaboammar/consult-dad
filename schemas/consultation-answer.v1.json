@@ -1,0 +1,78 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://consult-dad.dev/schemas/consultation-answer.v1.json",
+  "title": "ConsultationAnswer",
+  "description": "Schema for the structured advisory answer returned by Consult Dad",
+  "type": "object",
+  "properties": {
+    "schema": {
+      "type": "string",
+      "const": "consult-dad.answer.v1"
+    },
+    "consultation_id": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["completed", "partial", "failed"]
+    },
+    "advisor": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "adapter": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "adapter"],
+      "additionalProperties": false
+    },
+    "verdict": {
+      "type": "string"
+    },
+    "recommendation": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "assumptions": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "risks": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "verification": {
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "worker_action": {
+      "type": "string",
+      "enum": ["continue", "retry", "escalate", "abort"]
+    },
+    "needs_followup": {
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "schema",
+    "consultation_id",
+    "status",
+    "advisor",
+    "verdict",
+    "confidence",
+    "worker_action",
+    "needs_followup"
+  ],
+  "additionalProperties": false
+}
