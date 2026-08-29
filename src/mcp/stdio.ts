@@ -3,9 +3,8 @@ import { ConsultationBroker } from "../broker/broker";
 import { ConsultationStore } from "../store/sqlite";
 import { ArtifactStore } from "../store/artifacts";
 import { AdvisorRegistry } from "../core/routing";
-import { FakeAdvisorAdapter } from "../adapters/fake";
-import { CodexAdapter } from "../adapters/codex";
-import { ClaudeAdapter } from "../adapters/claude";
+import { ConfigLoader } from "../config/loader";
+import { ConfigTrust } from "../security/config-trust";
 import { createMcpServer } from "./server";
 import { join } from "node:path";
 
@@ -17,31 +16,20 @@ export async function runStdioServer(): Promise<void> {
     join(process.env.HOME || "", ".local/state/consult-dad/consultations")
   );
 
+  const trust = new ConfigTrust();
   const registry = new AdvisorRegistry();
-  const staff = new CodexAdapter({ id: "staff" });
-  const architect = new ClaudeAdapter({ id: "architect" });
-  const fake = new FakeAdvisorAdapter({ id: "fake-advisor" });
+  const loader = new ConfigLoader({
+    workspaceRoot: process.cwd(),
+    configTrust: trust,
+  });
 
-  registry.register({
-    adapter: staff,
-    priority: 100,
-    capabilities: ["architecture", "debugging", "code-review", "concurrency"],
-  });
-  registry.register({
-    adapter: architect,
-    priority: 90,
-    capabilities: ["architecture", "design", "tradeoffs"],
-  });
-  registry.register({
-    adapter: fake,
-    priority: 10,
-    capabilities: ["general", "testing"],
-  });
+  const loaded = loader.load();
+  loader.applyToRegistry(loaded.config, registry);
 
   const broker = new ConsultationBroker({
     store,
     artifactStore,
-    defaultAdapter: staff,
+    registry,
   });
 
   const server = createMcpServer(broker, registry);

@@ -173,6 +173,23 @@ export class ConsultationStore {
     return rows.map((r) => this.get(r.consultation_id)!);
   }
 
+  prune(olderThanIso: string): string[] {
+    const rows = this.db
+      .prepare(`SELECT consultation_id FROM consultations WHERE started_at < ?`)
+      .all(olderThanIso) as any[];
+    
+    const ids = rows.map((r) => r.consultation_id);
+    if (ids.length === 0) return [];
+
+    const deleteStmt = this.db.prepare(`DELETE FROM consultations WHERE started_at < ?`);
+    deleteStmt.run(olderThanIso);
+    return ids;
+  }
+
+  vacuum(): void {
+    this.db.exec("VACUUM;");
+  }
+
   close(): void {
     this.db.close();
   }

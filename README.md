@@ -9,6 +9,7 @@
 [![Built with Bun](https://img.shields.io/badge/Bun-1.3+-FBF0DF?style=flat-square&logo=bun&logoColor=000)](https://bun.sh)
 [![Protocol v1](https://img.shields.io/badge/protocol-v1.0-blue?style=flat-square)](docs/protocol.md)
 [![MCP Ready](https://img.shields.io/badge/MCP-compatible-green?style=flat-square)](docs/mcp.md)
+[![TypeScript Strict](https://img.shields.io/badge/TypeScript-Strict-3178C6?style=flat-square&logo=typescript&logoColor=fff)](tsconfig.json)
 
 </div>
 
@@ -16,7 +17,7 @@
 
 ## 💡 The Problem
 
-When AI coding agents (Gemini, Claude Code, Codex) get stuck in failure loops or hit architectural crossroads (schema migrations, deadlock concurrency, token race conditions), they often thrash — trying the same failed change repeatedly or hallucinating invalid fixes.
+When AI coding agents (Gemini CLI, Claude Code, Codex, Cursor, OpenCode) get stuck in failure loops or hit architectural crossroads (schema migrations, deadlock concurrency, token race conditions), they often thrash — trying the same failed change repeatedly or hallucinating invalid fixes.
 
 Delegation tools ask: *Who should do this entire task?*  
 **Consult Dad asks:** *When does the current worker need a higher technical opinion before continuing?*
@@ -28,61 +29,92 @@ Delegation tools ask: *Who should do this entire task?*
 ### 1. Installation
 
 ```bash
+git clone https://github.com/imMamdouhaboammar/consult-dad.git
 cd consult-dad
 bun install
 bun run build
 ```
 
-### 2. Verify Health
+### 2. Verify System & Advisor Health
 
 ```bash
 bun run dad doctor
 ```
 
-### 3. Consult Dad via CLI
+### 3. Initialize Project Configuration
 
 ```bash
-# General consultation
-bun run dad ask "Should we use database locks or optimistic concurrency for inventory reservation?"
+bun run dad init
+```
+This generates `.consult-dad/config.json` with recommended defaults and approves its SHA-256 trust hash.
 
-# Diagnostic mode with hypothesis
-bun run dad ask --mode diagnose --hypothesis "Two refresh calls racing" "Find root cause of auth token test failure"
+### 4. Consult Dad via CLI
 
-# JSON mode for agents
+```bash
+# General consultation with file attachments
+bun run dad ask -f src/auth/token.ts "Should we use database locks or optimistic concurrency for token refresh?"
+
+# Diagnostic mode with hypothesis and failing test
+bun run dad ask -m diagnose --hypothesis "Lock acquired in reverse order" --test "auth.test.ts" "Why does auth token deadlock under load?"
+
+# Decision mode with git diff
+bun run dad ask -m decide --diff "Is this migration safe for production deployment?"
+
+# Machine-readable JSON output for AI pipelines
 bun run dad ask --json "Explain deadlock in worker pool"
 ```
 
-### 4. Resume Thread on New Evidence
+### 5. Resume Thread on New Evidence
 
 ```bash
 bun run dad followup dad_01HXYZ "Tested option A with 50 concurrent threads, no deadlock observed"
 ```
 
+### 6. Inspect Consultation Logs & Timeline
+
+```bash
+bun run dad logs dad_01HXYZ
+```
+
 ---
 
-## 🛠️ MCP Server
+## 🛠️ MCP Server (Tools, Resources & Prompts)
 
-To attach Consult Dad directly to your agent's MCP tools:
+To attach Consult Dad directly to Claude Desktop, Cursor, or Gemini CLI:
 
 ```json
 {
   "mcpServers": {
     "consult-dad": {
       "command": "bun",
-      "args": ["run", "/path/to/consult-dad/src/mcp/stdio.ts"]
+      "args": ["run", "/absolute/path/to/consult-dad/src/mcp/stdio.ts"]
     }
   }
 }
 ```
 
+### Supported MCP Capabilities:
+- **Tools**: `dad_consult`, `dad_followup`, `dad_status`, `dad_result`, `dad_cancel`, `dad_list_advisors`, `dad_explain_route`
+- **Resources**: `dad://consultations/latest`, `dad://consultations/{id}`, `dad://advisors`
+- **Prompts**: `dad_escalation_triage`, `dad_consult_brief`
+
+---
+
+## 🛡️ Security & Governance
+
+1. **Read-Only by Default**: Consultations never edit files or land commits without explicit `--allow-write` in `takeover` mode.
+2. **Cryptographic Config Trust**: Protects against malicious `.consult-dad/config.json` via SHA-256 approval tracking (`dad trust`).
+3. **Secret Redaction**: Automatically scrubs API tokens (OpenAI, Anthropic, GitHub, Slack, AWS, GCP, DB URIs, JWTs) from prompts and persisted artifacts.
+4. **Max Depth = 1**: Advisors cannot recursively consult other advisors, preventing runaway token loops.
+
 ---
 
 ## 📚 Documentation
 
-- [Architecture](docs/architecture.md)
+- [Architecture & Design](docs/architecture.md)
 - [Protocol Specification](docs/protocol.md)
-- [Advisor Adapters](docs/adapters.md)
-- [Model Context Protocol](docs/mcp.md)
+- [Advisor Adapters & Dynamic Routing](docs/adapters.md)
+- [Model Context Protocol (MCP)](docs/mcp.md)
 - [Threat Model & Security](docs/threat-model.md)
 - [Agentic SKILL.md](skills/consult-dad/SKILL.md)
 

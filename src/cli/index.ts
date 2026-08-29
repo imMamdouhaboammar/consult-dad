@@ -4,9 +4,8 @@ import { ConsultationBroker } from "../broker/broker";
 import { ConsultationStore } from "../store/sqlite";
 import { ArtifactStore } from "../store/artifacts";
 import { AdvisorRegistry } from "../core/routing";
-import { CodexAdapter } from "../adapters/codex";
-import { ClaudeAdapter } from "../adapters/claude";
-import { FakeAdvisorAdapter } from "../adapters/fake";
+import { ConfigLoader } from "../config/loader";
+import { ConfigTrust } from "../security/config-trust";
 
 import { createAskCommand } from "./ask";
 import { createFollowupCommand } from "./followup";
@@ -17,6 +16,9 @@ import { createAdvisorsCommand } from "./advisors";
 import { createDoctorCommand } from "./doctor";
 import { createServeCommand } from "./serve";
 import { createTrustCommand } from "./trust";
+import { createInitCommand } from "./init";
+import { createLogsCommand } from "./logs";
+import { createPruneCommand } from "./prune";
 import { join } from "node:path";
 
 export interface CliDependencies {
@@ -24,39 +26,28 @@ export interface CliDependencies {
   artifactStore?: ArtifactStore;
   registry?: AdvisorRegistry;
   broker?: ConsultationBroker;
+  configTrust?: ConfigTrust;
+  workspaceRoot?: string;
 }
 
 export function createCli(deps: CliDependencies = {}): Command {
+  const defaultTrust = deps.configTrust || new ConfigTrust();
   const defaultStore =
-    deps.store || new ConsultationStore(join(process.env.HOME || "", ".local/state/consult-dad/consult-dad.db"));
+    deps.store ||
+    new ConsultationStore(join(process.env.HOME || "", ".local/state/consult-dad/consult-dad.db"));
   const defaultArtifactStore =
-    deps.artifactStore || new ArtifactStore(join(process.env.HOME || "", ".local/state/consult-dad/consultations"));
+    deps.artifactStore ||
+    new ArtifactStore(join(process.env.HOME || "", ".local/state/consult-dad/consultations"));
 
   const defaultRegistry = deps.registry || new AdvisorRegistry();
 
   if (!deps.registry) {
-    const codex = new CodexAdapter({ id: "staff" });
-    const claude = new ClaudeAdapter({ id: "architect" });
-    const fake = new FakeAdvisorAdapter({ id: "fake-advisor" });
-
-    defaultRegistry.register({
-      adapter: codex,
-      priority: 100,
-      capabilities: ["architecture", "debugging", "code-review", "concurrency"],
-      description: "Codex Staff Engineer",
+    const loader = new ConfigLoader({
+      workspaceRoot: deps.workspaceRoot || process.cwd(),
+      configTrust: defaultTrust,
     });
-    defaultRegistry.register({
-      adapter: claude,
-      priority: 90,
-      capabilities: ["architecture", "design", "tradeoffs"],
-      description: "Claude Principal Architect",
-    });
-    defaultRegistry.register({
-      adapter: fake,
-      priority: 10,
-      capabilities: ["general", "testing"],
-      description: "Local Mock Advisor",
-    });
+    const loadedConfig = loader.load();
+    loader.applyToRegistry(loadedConfig.config, defaultRegistry);
   }
 
   const defaultBroker =
@@ -64,7 +55,7 @@ export function createCli(deps: CliDependencies = {}): Command {
     new ConsultationBroker({
       store: defaultStore,
       artifactStore: defaultArtifactStore,
-      defaultAdapter: new FakeAdvisorAdapter({ id: "staff" }),
+      registry: defaultRegistry,
     });
 
   const program = new Command();
@@ -79,9 +70,14 @@ export function createCli(deps: CliDependencies = {}): Command {
   program.addCommand(createResultCommand(defaultBroker));
   program.addCommand(createCancelCommand(defaultBroker));
   program.addCommand(createAdvisorsCommand(defaultRegistry));
-  program.addCommand(createDoctorCommand(defaultRegistry, defaultStore, defaultArtifactStore));
+  program.addCommand(
+    createDoctorCommand(defaultRegistry, defaultStore, defaultArtifactStore, defaultTrust)
+  );
   program.addCommand(createServeCommand());
   program.addCommand(createTrustCommand());
+  program.addCommand(createInitCommand(defaultTrust));
+  program.addCommand(createLogsCommand(defaultBroker, defaultArtifactStore));
+  program.addCommand(createPruneCommand(defaultStore, defaultArtifactStore));
 
   return program;
 }

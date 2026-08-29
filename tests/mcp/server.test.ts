@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createMcpToolDefinitions } from "../../src/mcp/tools";
+import { createMcpServer } from "../../src/mcp/server";
 import { ConsultationBroker } from "../../src/broker/broker";
 import { ConsultationStore } from "../../src/store/sqlite";
 import { ArtifactStore } from "../../src/store/artifacts";
@@ -9,7 +10,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { existsSync, rmSync } from "node:fs";
 
-describe("MCP Tools & Server", () => {
+describe("MCP Tools, Resources & Prompts", () => {
   let store: ConsultationStore;
   let artifactStore: ArtifactStore;
   let registry: AdvisorRegistry;
@@ -32,6 +33,7 @@ describe("MCP Tools & Server", () => {
       store,
       artifactStore,
       defaultAdapter: fakeAdapter,
+      registry,
     });
   });
 
@@ -108,5 +110,10 @@ describe("MCP Tools & Server", () => {
     const list = JSON.parse(res.content[0].text);
     expect(list.length).toBeGreaterThan(0);
     expect(list[0].id).toBe("staff");
+  });
+
+  it("creates an MCP server instance with tools, resources, and prompts registered", () => {
+    const server = createMcpServer(broker, registry);
+    expect(server).toBeDefined();
   });
 });

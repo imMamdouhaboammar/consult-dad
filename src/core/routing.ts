@@ -47,7 +47,10 @@ export class AdvisorRegistry {
     return list.sort((a, b) => b.priority - a.priority);
   }
 
-  async resolve(rawRequest: ConsultationRequestInput | ConsultationRequest, explicitAdvisorId?: string): Promise<AdvisorAdapter> {
+  async resolveCandidates(
+    rawRequest: ConsultationRequestInput | ConsultationRequest,
+    explicitAdvisorId?: string
+  ): Promise<AdvisorAdapter[]> {
     const request = ConsultationRequestSchema.parse(rawRequest);
     if (explicitAdvisorId) {
       const entry = this.entries.get(explicitAdvisorId);
@@ -58,7 +61,7 @@ export class AdvisorRegistry {
       if (!probe.available) {
         throw new Error(`Advisor '${explicitAdvisorId}' is registered but unavailable`);
       }
-      return entry.adapter;
+      return [entry.adapter];
     }
 
     const neededCapabilities = this.inferCapabilities(request.mode, request.question);
@@ -82,7 +85,15 @@ export class AdvisorRegistry {
     }
 
     candidates.sort((a, b) => b.score - a.score);
-    return candidates[0].entry.adapter;
+    return candidates.map((c) => c.entry.adapter);
+  }
+
+  async resolve(
+    rawRequest: ConsultationRequestInput | ConsultationRequest,
+    explicitAdvisorId?: string
+  ): Promise<AdvisorAdapter> {
+    const candidates = await this.resolveCandidates(rawRequest, explicitAdvisorId);
+    return candidates[0];
   }
 
   async explain(rawRequest: ConsultationRequestInput | ConsultationRequest): Promise<string> {
@@ -116,13 +127,27 @@ Reason: Best available match for mode='${request.mode}' and capabilities=[${need
         caps.push("general");
     }
 
-    if (questionLower.includes("race") || questionLower.includes("deadlock") || questionLower.includes("concurrent") || questionLower.includes("lock")) {
+    if (
+      questionLower.includes("race") ||
+      questionLower.includes("deadlock") ||
+      questionLower.includes("concurrent") ||
+      questionLower.includes("lock")
+    ) {
       caps.push("concurrency");
     }
-    if (questionLower.includes("security") || questionLower.includes("auth") || questionLower.includes("leak") || questionLower.includes("secret")) {
+    if (
+      questionLower.includes("security") ||
+      questionLower.includes("auth") ||
+      questionLower.includes("leak") ||
+      questionLower.includes("secret")
+    ) {
       caps.push("threat-modeling");
     }
-    if (questionLower.includes("refactor") || questionLower.includes("clean") || questionLower.includes("dry")) {
+    if (
+      questionLower.includes("refactor") ||
+      questionLower.includes("clean") ||
+      questionLower.includes("dry")
+    ) {
       caps.push("refactoring");
     }
 

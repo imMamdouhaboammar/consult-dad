@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
 
 export class ArtifactStore {
@@ -30,7 +30,11 @@ export class ArtifactStore {
   readJson<T = any>(id: string, filename: string): T | null {
     const filePath = join(this.getConsultationDir(id), filename);
     if (!existsSync(filePath)) return null;
-    return JSON.parse(readFileSync(filePath, "utf-8"));
+    try {
+      return JSON.parse(readFileSync(filePath, "utf-8"));
+    } catch {
+      return null;
+    }
   }
 
   writeText(id: string, filename: string, content: string): string {
@@ -49,6 +53,25 @@ export class ArtifactStore {
   readText(id: string, filename: string): string | null {
     const filePath = join(this.getConsultationDir(id), filename);
     if (!existsSync(filePath)) return null;
-    return readFileSync(filePath, "utf-8");
+    try {
+      return readFileSync(filePath, "utf-8");
+    } catch {
+      return null;
+    }
+  }
+
+  readLog(id: string, filename: string): string | null {
+    return this.readText(id, filename);
+  }
+
+  deleteConsultationDir(id: string): void {
+    const dir = this.getConsultationDir(id);
+    if (existsSync(dir)) {
+      try {
+        rmSync(dir, { recursive: true, force: true });
+      } catch (err) {
+        console.warn(`[consult-dad] Could not remove directory '${dir}':`, err);
+      }
+    }
   }
 }

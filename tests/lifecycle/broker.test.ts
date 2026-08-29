@@ -3,6 +3,7 @@ import { ConsultationBroker } from "../../src/broker/broker";
 import { ConsultationStore } from "../../src/store/sqlite";
 import { ArtifactStore } from "../../src/store/artifacts";
 import { FakeAdvisorAdapter } from "../../src/adapters/fake";
+import { AdvisorRegistry } from "../../src/core/routing";
 import { ConsultationRequest } from "../../src/core/protocol";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -101,5 +102,76 @@ describe("ConsultationBroker", () => {
     expect(savedReq).not.toBeNull();
     expect(savedAns).not.toBeNull();
     expect(savedAns.consultation_id).toBe(id);
+  });
+
+  it("resolves advisor dynamically from registry based on capabilities", async () => {
+    const registry = new AdvisorRegistry();
+    const specializedAdapter = new FakeAdvisorAdapter({ id: "concurrency-specialist" });
+    registry.register({
+      adapter: specializedAdapter,
+      priority: 120,
+      capabilities: ["concurrency", "debugging"],
+      description: "Concurrency Specialist",
+    });
+
+    const registryBroker = new ConsultationBroker({
+      store,
+      artifactStore,
+      registry,
+    });
+
+    const id = await registryBroker.consult(validReq);
+    const state = registryBroker.status(id);
+    expect(state?.advisor_id).toBe("concurrency-specialist");
+  });
+
+  it("fails over automatically to secondary advisor when primary fails", async () => {
+    const registry = new AdvisorRegistry();
+    const failingPrimary = new FakeAdvisorAdapter({
+      id: "failing-primary",
+      simulateAvailabilityError: false,
+    });
+    // Force start to fail on primary
+    failingPrimary.start = async () => ({
+      consultation_id: "test",
+      advisor_id: "failing-primary",
+      native_session_id: null,
+      status: "failed",
+      answer: null,
+      stderr: "Simulated primary crash",
+    });
+
+    const backupAdvisor = new FakeAdvisorAdapter({
+      id: "backup-advisor",
+      customVerdict: "Backup Advisor Rescue Verdict",
+    });
+
+    registry.register({
+      adapter: failingPrimary,
+      priority: 200,
+      capabilities: ["debugging", "concurrency"],
+    });
+
+    registry.register({
+      adapter: backupAdvisor,
+      priority: 100,
+      capabilities: ["debugging", "concurrency"],
+    });
+
+    const failoverBroker = new ConsultationBroker({
+      store,
+      artifactStore,
+      registry,
+    });
+
+    const id = await failoverBroker.consult(validReq);
+    const answer = await failoverBroker.result(id);
+
+    expect(answer.verdict).toBe("Backup Advisor Rescue Verdict");
+    const state = failoverBroker.status(id);
+    expect(state?.status).toBe("completed");
+    const failoverEvent = state?.events.find((e) => e.type === "failover");
+    expect(failoverEvent).toBeDefined();
+    expect(failoverEvent?.detail).toContain("Failing over from 'failing-primary' to 'backup-advisor'");
   });
 });

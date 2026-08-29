@@ -18,6 +18,7 @@
     "prompts",
     "schemas",
     "docs",
+    "hooks",
     "README.md",
     "LICENSE",
     "AGENTS.md"

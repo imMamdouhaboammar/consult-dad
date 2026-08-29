@@ -1,6 +1,7 @@
 import { ConsultationStore, ListFilter } from "../store/sqlite";
 import { ArtifactStore } from "../store/artifacts";
 import { AdvisorAdapter, AdvisorRun } from "../adapters/adapter";
+import { AdvisorRegistry } from "../core/routing";
 import {
   ConsultationRequest,
   ConsultationRequestInput,
@@ -16,15 +17,17 @@ import { ConsultationQueue } from "./queue";
 export interface BrokerOptions {
   store: ConsultationStore;
   artifactStore: ArtifactStore;
-  defaultAdapter: AdvisorAdapter;
+  defaultAdapter?: AdvisorAdapter;
   adapters?: Map<string, AdvisorAdapter>;
+  registry?: AdvisorRegistry;
 }
 
 export class ConsultationBroker {
   private store: ConsultationStore;
   private artifactStore: ArtifactStore;
-  private defaultAdapter: AdvisorAdapter;
+  private defaultAdapter?: AdvisorAdapter;
   private adapters: Map<string, AdvisorAdapter>;
+  private registry?: AdvisorRegistry;
   private queue: ConsultationQueue;
   private activeRuns: Map<string, AdvisorRun> = new Map();
 
@@ -32,8 +35,11 @@ export class ConsultationBroker {
     this.store = options.store;
     this.artifactStore = options.artifactStore;
     this.defaultAdapter = options.defaultAdapter;
+    this.registry = options.registry;
     this.adapters = options.adapters || new Map();
-    this.adapters.set(this.defaultAdapter.id, this.defaultAdapter);
+    if (this.defaultAdapter) {
+      this.adapters.set(this.defaultAdapter.id, this.defaultAdapter);
+    }
     this.queue = new ConsultationQueue();
   }
 
@@ -46,67 +52,165 @@ export class ConsultationBroker {
       if (this.adapters.has(id)) {
         return this.adapters.get(id)!;
       }
+      if (this.registry) {
+        const registered = this.registry.get(id);
+        if (registered) {
+          return registered.adapter;
+        }
+      }
       throw new Error(`advisor_unavailable: Advisor '${id}' is not registered`);
     }
-    return this.defaultAdapter;
+
+    if (this.defaultAdapter) {
+      return this.defaultAdapter;
+    }
+
+    if (this.adapters.size > 0) {
+      return this.adapters.values().next().value!;
+    }
+
+    throw new Error("advisor_unavailable: No default advisor configured in broker");
   }
 
-  async consult(rawRequest: ConsultationRequestInput | ConsultationRequest, contextId?: string, advisorId?: string): Promise<string> {
+  async resolveCandidatesForRequest(
+    request: ConsultationRequest,
+    explicitAdvisorId?: string
+  ): Promise<AdvisorAdapter[]> {
+    if (explicitAdvisorId) {
+      const adapter = this.getAdapter(explicitAdvisorId);
+      const probe = await adapter.probe();
+      if (!probe.available) {
+        throw new Error(`advisor_unavailable: Advisor '${explicitAdvisorId}' is not available`);
+      }
+      if (!probe.authenticated) {
+        throw new Error(`advisor_not_authenticated: Advisor '${explicitAdvisorId}' is not authenticated`);
+      }
+      return [adapter];
+    }
+
+    if (this.registry) {
+      try {
+        const candidates = await this.registry.resolveCandidates(request);
+        if (candidates.length > 0) {
+          return candidates;
+        }
+      } catch (registryError) {
+        if (this.defaultAdapter) {
+          return [this.defaultAdapter];
+        }
+        throw registryError;
+      }
+    }
+
+    return [this.getAdapter()];
+  }
+
+  async consult(
+    rawRequest: ConsultationRequestInput | ConsultationRequest,
+    contextId?: string,
+    advisorId?: string
+  ): Promise<string> {
     const request = ConsultationRequestSchema.parse(rawRequest);
 
     // Enforce max_depth / prevent recursive consultations
     if (
       request.caller.role.toLowerCase().includes("dad") ||
-      request.caller.role.toLowerCase().includes("advisor")
+      request.caller.role.toLowerCase().includes("advisor") ||
+      request.caller.agent.toLowerCase().includes("dad")
     ) {
       throw new Error("policy_denied: Recursive Dad consultation forbidden (max_depth: 1)");
     }
 
-    const adapter = this.getAdapter(advisorId);
+    const candidateAdapters = await this.resolveCandidatesForRequest(request, advisorId);
+    const initialAdapter = candidateAdapters[0];
     const id = this.store.create(request, contextId);
 
     // Save request artifact on disk
     this.artifactStore.writeJson(id, "request.json", request);
-    this.store.appendEvent(id, "created", `Consultation requested via adapter: ${adapter.id}`);
+    this.store.appendEvent(id, "created", `Consultation requested (primary advisor: ${initialAdapter.id})`);
 
     // Update state to queued
-    this.store.updateStatus(id, "queued", adapter.id);
+    this.store.updateStatus(id, "queued", initialAdapter.id);
     this.store.appendEvent(id, "queued", "Enqueued for execution");
 
     // Execute via queue
     return this.queue.enqueue(async () => {
-      try {
-        LifecycleStateMachine.assertTransition("queued", "running");
-        this.store.updateStatus(id, "running", adapter.id);
-        this.store.appendEvent(id, "running", `Starting advisor: ${adapter.id}`);
+      LifecycleStateMachine.assertTransition("queued", "running");
+      this.store.updateStatus(id, "running", initialAdapter.id);
 
-        const runRequest: ConsultationRequest = {
-          ...request,
-          consultation_id: id,
-        };
+      const runRequest: ConsultationRequest = {
+        ...request,
+        consultation_id: id,
+      };
 
-        const run = await adapter.start(runRequest);
-        this.activeRuns.set(id, run);
+      let lastError: string | null = null;
 
-        if (run.status === "completed" && run.answer) {
-          this.store.saveAnswer(id, run.answer);
-          this.store.appendEvent(id, "completed", "Answer produced and validated");
-          this.artifactStore.writeJson(id, "answer.json", run.answer);
-        } else if (run.status === "canceled") {
-          this.store.updateStatus(id, "canceled");
-          this.store.appendEvent(id, "canceled", "Advisor run canceled");
-        } else {
-          this.store.updateStatus(id, "failed");
-          this.store.appendEvent(id, "failed", `Advisor run status: ${run.status}`);
+      for (let i = 0; i < candidateAdapters.length; i++) {
+        const adapter = candidateAdapters[i];
+        try {
+          this.store.updateStatus(id, "running", adapter.id);
+          this.store.appendEvent(id, "running", `Starting advisor: ${adapter.id}`);
+
+          const run = await adapter.start(runRequest);
+          this.activeRuns.set(id, run);
+
+          if (run.status === "completed" && run.answer) {
+            this.store.saveAnswer(id, run.answer);
+            this.store.appendEvent(id, "completed", `Answer produced by ${adapter.id} and validated`);
+            this.artifactStore.writeJson(id, "answer.json", run.answer);
+            return id;
+          }
+
+          if (run.status === "canceled") {
+            this.store.updateStatus(id, "canceled");
+            this.store.appendEvent(id, "canceled", `Advisor ${adapter.id} run canceled`);
+            return id;
+          }
+
+          // Advisor failed
+          lastError = run.stderr || `Advisor '${adapter.id}' returned status: ${run.status}`;
+          this.store.appendEvent(
+            id,
+            "advisor_failed",
+            `Advisor '${adapter.id}' failed: ${lastError}`
+          );
+          if (run.stderr) {
+            this.artifactStore.appendLog(id, "stderr.log", run.stderr + "\n");
+          }
+
+          // If there is another candidate, attempt failover
+          if (i + 1 < candidateAdapters.length) {
+            const nextAdvisor = candidateAdapters[i + 1];
+            this.store.appendEvent(
+              id,
+              "failover",
+              `Failing over from '${adapter.id}' to '${nextAdvisor.id}'`
+            );
+          }
+        } catch (err: any) {
+          lastError = err.message || "Unknown error";
+          this.store.appendEvent(
+            id,
+            "advisor_error",
+            `Advisor '${adapter.id}' threw error: ${lastError}`
+          );
+          this.artifactStore.appendLog(id, "stderr.log", `${err.stack || err}\n`);
+
+          if (i + 1 < candidateAdapters.length) {
+            const nextAdvisor = candidateAdapters[i + 1];
+            this.store.appendEvent(
+              id,
+              "failover",
+              `Failing over from '${adapter.id}' to '${nextAdvisor.id}'`
+            );
+          }
         }
-
-        return id;
-      } catch (err: any) {
-        this.store.updateStatus(id, "failed");
-        this.store.appendEvent(id, "failed", err.message || "Unknown failure");
-        this.artifactStore.appendLog(id, "stderr.log", `${err.stack || err}\n`);
-        throw err;
       }
+
+      // If loop finishes without returning, all candidate advisors failed
+      this.store.updateStatus(id, "failed");
+      this.store.appendEvent(id, "failed", `All candidate advisors failed. Last error: ${lastError}`);
+      return id;
     });
   }
 
@@ -157,7 +261,10 @@ export class ConsultationBroker {
       throw new Error(`Consultation '${id}' not found`);
     }
     if (!state.answer) {
-      throw new Error(`Consultation '${id}' has no completed answer yet (status: ${state.status})`);
+      const lastEvent = state.events[state.events.length - 1]?.detail || "";
+      throw new Error(
+        `Consultation '${id}' failed without an answer (status: ${state.status}). ${lastEvent ? `Reason: ${lastEvent}. ` : ""}Run 'dad logs ${id}' for full timeline.`
+      );
     }
     return state.answer;
   }
