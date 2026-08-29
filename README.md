@@ -26,29 +26,51 @@ Delegation tools ask: *Who should do this entire task?*
 
 ## ⚡ Quickstart
 
-### 1. Installation
+### 1. One-Line Universal Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/imMamdouhaboammar/consult-dad/main/install.sh | bash
+```
+
+*Or install manually via Bun:*
 
 ```bash
 git clone https://github.com/imMamdouhaboammar/consult-dad.git
 cd consult-dad
 bun install
 bun run build
+bun link
 ```
 
-### 2. Verify System & Advisor Health
+### 2. Distribute Skill to AI Agent Ecosystems
+
+Distribute the Consult Dad skill and MCP server to Gemini CLI / Antigravity, Claude Code, Cursor, OpenCode, and standard cross-agent directories:
+
+```bash
+# Distribute across all detected AI agent environments
+dad skill install --all --mcp
+
+# Audit skill integrity and reference guides
+dad skill doctor
+
+# Check cross-runtime installation status
+dad skill list
+```
+
+### 3. Verify System & Advisor Health
 
 ```bash
 bun run dad doctor
 ```
 
-### 3. Initialize Project Configuration
+### 4. Initialize Project Configuration
 
 ```bash
 bun run dad init
 ```
 This generates `.consult-dad/config.json` with recommended defaults and approves its SHA-256 trust hash.
 
-### 4. Consult Dad via CLI
+### 5. Consult Dad via CLI
 
 ```bash
 # General consultation with file attachments
@@ -64,13 +86,13 @@ bun run dad ask -m decide --diff "Is this migration safe for production deployme
 bun run dad ask --json "Explain deadlock in worker pool"
 ```
 
-### 5. Resume Thread on New Evidence
+### 6. Resume Thread on New Evidence
 
 ```bash
 bun run dad followup dad_01HXYZ "Tested option A with 50 concurrent threads, no deadlock observed"
 ```
 
-### 6. Inspect Consultation Logs & Timeline
+### 7. Inspect Consultation Logs & Timeline
 
 ```bash
 bun run dad logs dad_01HXYZ
@@ -111,6 +133,7 @@ To attach Consult Dad directly to Claude Desktop, Cursor, or Gemini CLI:
 
 ## 📚 Documentation
 
+- [Skill Distribution & Agent Setup](docs/distribution.md)
 - [Architecture & Design](docs/architecture.md)
 - [Protocol Specification](docs/protocol.md)
 - [Advisor Adapters & Dynamic Routing](docs/adapters.md)

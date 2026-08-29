@@ -19,6 +19,8 @@
     "schemas",
     "docs",
     "hooks",
+    "templates",
+    "install.sh",
     "README.md",
     "LICENSE",
     "AGENTS.md"
@@ -29,7 +31,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "dad": "bun run src/cli/index.ts"
+    "dad": "bun run src/cli/index.ts",
+    "package:dist": "bun run scripts/package-dist.ts"
   },
   "keywords": [
     "ai",

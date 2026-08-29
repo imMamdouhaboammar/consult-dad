@@ -1,0 +1,34 @@
+{
+  "schema": "consult-dad.request.v1",
+  "consultation_id": "dad_01JEXAMPLES02",
+  "mode": "decide",
+  "caller": {
+    "agent": "worker-db",
+    "role": "worker"
+  },
+  "goal": "Migrate user preferences table from JSON blob to normalized relational columns",
+  "question": "Should we use dual-write trigger migration or a backward-compatible virtual view with online shadow backfill?",
+  "current_hypothesis": "A backward-compatible view prevents downtime on read-heavy dashboards while batch workers copy historical rows",
+  "attempts": [
+    {
+      "action": "Drafted single-step ALTER TABLE migration",
+      "outcome": "Exceeded 30s migration lock timeout during staging database benchmark"
+    }
+  ],
+  "evidence": {
+    "failing_tests": [],
+    "errors": [
+      "Lock wait timeout exceeded during DDL on users_preferences (table size 12GB)"
+    ],
+    "relevant_files": [
+      "src/db/migrations/20260829_preferences.sql",
+      "src/models/user-prefs.ts"
+    ],
+    "git_diff": null
+  },
+  "constraints": {
+    "read_only": true,
+    "workspace_root": "/workspace"
+  },
+  "decision_needed": "Architectural recommendation on the safest zero-downtime migration strategy"
+}

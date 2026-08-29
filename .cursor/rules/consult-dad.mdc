@@ -1,0 +1,18 @@
+---
+description: Consult Dad escalation rule for Cursor AI
+globs: *
+alwaysApply: false
+---
+
+# Consult Dad — Cursor Agent Escalation Rule
+
+When you are acting as an AI assistant / agent in Cursor:
+1. **Detect Obstacles**: If a proposed fix or test fails 2 times consecutively, STOP immediately.
+2. **Do Not Thrash**: Do not guess or repeatedly edit files without understanding root causes.
+3. **Escalate to Dad**:
+   - Use the `dad_consult` MCP tool (if MCP server is configured in `.cursor/mcp.json`)
+   - Or run the CLI command:
+     ```bash
+     dad ask --mode diagnose --hypothesis "<your theory>" -f <failing_file> "<the problem>"
+     ```
+4. **Follow Advice**: Inspect Dad's structured recommendation, verify it against repository ground truth, implement the changes yourself, and run verification tests.

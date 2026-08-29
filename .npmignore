@@ -1,0 +1,16 @@
+dist/release
+dist/*.zip
+dist/*.tar.gz
+dist/release/**
+.git
+.github
+tests
+evals
+coverage
+*.tmp
+.consult-dad/consultations
+.consult-dad/*.db
+.consult-dad/*.db-wal
+.consult-dad/*.db-shm
+.local
+*.log

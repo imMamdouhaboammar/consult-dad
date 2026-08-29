@@ -1,0 +1,81 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Ready-to-use MCP server configurations for Consult Dad across different AI agents",
+  "configs": {
+    "claude_desktop": {
+      "path": "~/Library/Application Support/Claude/claude_desktop_config.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"]
+          }
+        }
+      }
+    },
+    "claude_code": {
+      "path": "~/.claude/settings.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"]
+          }
+        }
+      }
+    },
+    "cursor": {
+      "path": ".cursor/mcp.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"]
+          }
+        }
+      }
+    },
+    "gemini_antigravity": {
+      "path": "~/.gemini/antigravity/mcp/consult-dad/config.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"]
+          }
+        }
+      }
+    },
+    "opencode": {
+      "path": "~/.config/opencode/mcp.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"]
+          }
+        }
+      }
+    },
+    "roo_code": {
+      "path": ".roo/mcp.json",
+      "snippet": {
+        "mcpServers": {
+          "consult-dad": {
+            "command": "dad",
+            "args": ["serve"],
+            "disabled": false,
+            "autoApprove": [
+              "dad_consult",
+              "dad_followup",
+              "dad_status",
+              "dad_result",
+              "dad_list_advisors",
+              "dad_explain_route"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

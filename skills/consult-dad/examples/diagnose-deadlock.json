@@ -1,0 +1,40 @@
+{
+  "schema": "consult-dad.request.v1",
+  "consultation_id": "dad_01JEXAMPLES01",
+  "mode": "diagnose",
+  "caller": {
+    "agent": "worker-auth",
+    "role": "worker"
+  },
+  "goal": "Resolve concurrent session token refresh test failure in test suite",
+  "question": "Why does auth worker pool deadlock when 50 threads refresh tokens simultaneously?",
+  "current_hypothesis": "The transaction in refreshToken() acquires the user lock and token lock in inverse order compared to revokeToken()",
+  "attempts": [
+    {
+      "action": "Increased database connection pool from 10 to 50",
+      "outcome": "Deadlock still occurred; all 50 connections remained blocked indefinitely"
+    },
+    {
+      "action": "Added 50ms setTimeout before acquire",
+      "outcome": "Flaky pass in local run, but 100% failure rate under CI stress test"
+    }
+  ],
+  "evidence": {
+    "failing_tests": [
+      "tests/auth/refresh.test.ts > handles 50 concurrent refresh operations cleanly"
+    ],
+    "errors": [
+      "Error: SQLITE_BUSY: database is locked in src/auth/token.ts:42"
+    ],
+    "relevant_files": [
+      "src/auth/token.ts",
+      "src/auth/session.ts"
+    ],
+    "git_diff": null
+  },
+  "constraints": {
+    "read_only": true,
+    "workspace_root": "/workspace"
+  },
+  "decision_needed": "Determine correct lock acquisition hierarchy or singleflight pattern to prevent concurrent token refresh race"
+}

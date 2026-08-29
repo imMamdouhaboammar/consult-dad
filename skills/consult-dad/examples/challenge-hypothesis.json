@@ -1,0 +1,34 @@
+{
+  "schema": "consult-dad.request.v1",
+  "consultation_id": "dad_01JEXAMPLES04",
+  "mode": "challenge",
+  "caller": {
+    "agent": "worker-cache",
+    "role": "worker"
+  },
+  "goal": "Explain why Redis memory usage spikes by 800MB despite TTL expiration configured on all keys",
+  "question": "Is our hypothesis that active key eviction is falling behind correct, or are hash structures bypassing TTL?",
+  "current_hypothesis": "Background eviction algorithm in Redis is throttled and unable to keep up with write rate",
+  "attempts": [
+    {
+      "action": "Changed maxmemory-policy from volatile-lru to allkeys-lru",
+      "outcome": "Memory remained high; active-defrag showed 0 bytes reclaimed"
+    }
+  ],
+  "evidence": {
+    "failing_tests": [],
+    "errors": [
+      "OOM command not allowed when used memory > 'maxmemory'"
+    ],
+    "relevant_files": [
+      "src/cache/redis.ts",
+      "src/cache/session-store.ts"
+    ],
+    "git_diff": null
+  },
+  "constraints": {
+    "read_only": true,
+    "workspace_root": "/workspace"
+  },
+  "decision_needed": "Challenge our hypothesis and find the actual root cause of the memory retention"
+}

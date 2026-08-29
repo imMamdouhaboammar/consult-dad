@@ -1,0 +1,27 @@
+{
+  "schema": "consult-dad.request.v1",
+  "consultation_id": "dad_01JEXAMPLES03",
+  "mode": "review",
+  "caller": {
+    "agent": "worker-api",
+    "role": "worker"
+  },
+  "goal": "Review OAuth 2.1 PKCE authorization callback verification logic before deployment",
+  "question": "Does this state and code_challenge validation prevent CSRF and token replay attacks?",
+  "current_hypothesis": "HMAC-signed state cookies paired with SHA-256 code challenge provide defense-in-depth against authorization code interception",
+  "attempts": [],
+  "evidence": {
+    "failing_tests": [],
+    "errors": [],
+    "relevant_files": [
+      "src/auth/oauth/pkce.ts",
+      "src/auth/oauth/callback.ts"
+    ],
+    "git_diff": "diff --git a/src/auth/oauth/callback.ts b/src/auth/oauth/callback.ts\nindex 1234..5678 100644\n--- a/src/auth/oauth/callback.ts\n+++ b/src/auth/oauth/callback.ts\n@@ -20,6 +20,12 @@ export async function handleOAuthCallback(req: Request) {\n+  const state = req.query.state;\n+  const storedState = req.cookies.oauth_state;\n+  if (!state || !storedState || !crypto.timingSafeEqual(Buffer.from(state), Buffer.from(storedState))) {\n+    throw new SecurityError('Invalid state');\n+  }\n"
+  },
+  "constraints": {
+    "read_only": true,
+    "workspace_root": "/workspace"
+  },
+  "decision_needed": "Security review and threat modeling of the OAuth callback code changes"
+}

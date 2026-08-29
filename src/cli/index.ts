@@ -19,6 +19,7 @@ import { createTrustCommand } from "./trust";
 import { createInitCommand } from "./init";
 import { createLogsCommand } from "./logs";
 import { createPruneCommand } from "./prune";
+import { createSkillCommand } from "./skill";
 import { join } from "node:path";
 
 export interface CliDependencies {
@@ -78,6 +79,7 @@ export function createCli(deps: CliDependencies = {}): Command {
   program.addCommand(createInitCommand(defaultTrust));
   program.addCommand(createLogsCommand(defaultBroker, defaultArtifactStore));
   program.addCommand(createPruneCommand(defaultStore, defaultArtifactStore));
+  program.addCommand(createSkillCommand(deps.workspaceRoot));
 
   return program;
 }
