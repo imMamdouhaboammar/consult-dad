@@ -41,10 +41,19 @@ export const AttemptSchema = z.object({
 });
 export type Attempt = z.infer<typeof AttemptSchema>;
 
+export const FileEvidenceSchema = z.object({
+  path: z.string().min(1),
+  content: z.string(),
+  truncated: z.boolean().default(false),
+  bytes_read: z.number().int().nonnegative().optional(),
+});
+export type FileEvidence = z.infer<typeof FileEvidenceSchema>;
+
 export const EvidenceSchema = z.object({
   failing_tests: z.array(z.string()).optional().default([]),
   errors: z.array(z.string()).optional().default([]),
   relevant_files: z.array(z.string()).optional().default([]),
+  file_contents: z.array(FileEvidenceSchema).optional().default([]),
   git_diff: z.string().nullable().optional().default(null),
   logs: z.array(z.string()).optional().default([]),
 });
