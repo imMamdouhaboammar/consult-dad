@@ -94,3 +94,18 @@ Run the system doctor to verify runtime, SQLite database engine, config trust ap
 ```bash
 dad doctor
 ```
+
+
+---
+
+## 6. Verify Distribution Packages
+
+Release artifacts are generated and verified with one deterministic command:
+
+```bash
+bun run package:verify
+```
+
+The command rebuilds the distribution from a clean `dist/release` directory, generates checksums, and runs the dedicated packaging verification suite. Normal `bun test` does not depend on pre-generated release artifacts.
+
+The release workflow runs this verification before publishing any GitHub Release assets.
