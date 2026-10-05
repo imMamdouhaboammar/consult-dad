@@ -10,7 +10,12 @@ const version = pkgJson.version || "0.0.1";
 const distDir = join(rootDir, "dist");
 const releaseDir = join(distDir, "release");
 
-console.log(`\n📦 Building Consult Dad Distribution Packages (v${version})...\n`);\n\n// Always verify a freshly generated release set. Never reuse stale artifacts.\nif (existsSync(releaseDir)) {\n  rmSync(releaseDir, { recursive: true, force: true });\n}
+console.log(`\n📦 Building Consult Dad Distribution Packages (v${version})...\n`);
+
+// Always verify a freshly generated release set. Never reuse stale artifacts.
+if (existsSync(releaseDir)) {
+  rmSync(releaseDir, { recursive: true, force: true });
+}
 
 // 1. Ensure build is fresh
 console.log("🔨 1. Running build...");
@@ -49,7 +54,7 @@ const skillTarPath = join(releaseDir, skillTarName);
 const skillZipName = `consult-dad-skill-v${version}.zip`;
 const skillZipPath = join(releaseDir, skillZipName);
 
-console.log(`📦 3. Creating Skill distribution archives...`);
+console.log("📦 3. Creating Skill distribution archives...");
 execSync(`tar -czf "${skillTarPath}" -C skills consult-dad`, {
   cwd: rootDir,
   stdio: "inherit",
@@ -65,7 +70,7 @@ try {
 }
 
 // 4. Generate SHA-256 Checksums
-console.log(`🔐 4. Generating SHA-256 Checksum Manifest (SHA256SUMS)...`);
+console.log("🔐 4. Generating SHA-256 Checksum Manifest (SHA256SUMS)...");
 const checksums: string[] = [];
 
 for (const fileName of [cliTarName, skillTarName, skillZipName]) {
@@ -73,7 +78,7 @@ for (const fileName of [cliTarName, skillTarName, skillZipName]) {
   if (existsSync(filePath)) {
     const fileBuffer = readFileSync(filePath);
     const hash = createHash("sha256").update(fileBuffer).digest("hex");
-    const stat = readFileSync(filePath).byteLength;
+    const stat = fileBuffer.byteLength;
     checksums.push(`${hash}  ${fileName} (${(stat / 1024).toFixed(1)} KB)`);
     console.log(`  ✓ ${fileName}: ${hash} (${(stat / 1024).toFixed(1)} KB)`);
   }
