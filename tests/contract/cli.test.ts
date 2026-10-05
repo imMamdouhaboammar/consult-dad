@@ -113,6 +113,36 @@ describe("Consult Dad CLI", () => {
     }
   });
 
+  it("rejects --allow-write outside takeover mode with actionable guidance", async () => {
+    const cli = createCli({ store, artifactStore, registry, broker, configTrust: trust });
+    const previousExitCode = process.exitCode;
+    let errorOutput = "";
+    const originalError = console.error;
+    console.error = (...args) => {
+      errorOutput += args.join(" ") + "\n";
+    };
+    process.exitCode = undefined;
+
+    try {
+      await cli.parseAsync([
+        "node",
+        "dad",
+        "ask",
+        "--allow-write",
+        "-m",
+        "diagnose",
+        "Should this be writable?",
+      ]);
+
+      expect(process.exitCode).toBe(1);
+      expect(errorOutput.toLowerCase()).toContain("takeover");
+      expect(broker.list()).toHaveLength(0);
+    } finally {
+      console.error = originalError;
+      process.exitCode = previousExitCode ?? 0;
+    }
+  });
+
   it("executes ask command with file and test arguments", async () => {
     const cli = createCli({ store, artifactStore, registry, broker, configTrust: trust });
 

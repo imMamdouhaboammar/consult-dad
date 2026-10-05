@@ -31,6 +31,14 @@ export function createAskCommand(broker: ConsultationBroker): Command {
     .action(async (question: string, options: any) => {
       try {
         const mode = ConsultationModeEnum.parse(options.mode);
+
+        if (options.allowWrite && mode !== "takeover") {
+          throw new Error("policy_denied: --allow-write is permitted only with --mode takeover");
+        }
+        if (mode === "takeover" && !options.allowWrite) {
+          throw new Error("policy_denied: --mode takeover requires explicit --allow-write authorization");
+        }
+
         const goal = options.goal || question;
 
         const relevantFiles: string[] = Array.isArray(options.file) ? options.file : [];

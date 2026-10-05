@@ -14,8 +14,9 @@ export function createMcpToolDefinitions(broker: ConsultationBroker, registry: A
           question: { type: "string", description: "Specific decision or diagnosis requested" },
           mode: {
             type: "string",
-            enum: ["consult", "diagnose", "review", "decide", "challenge", "takeover"],
+            enum: ["consult", "diagnose", "review", "decide", "challenge"],
             default: "consult",
+            description: "Read-only consultation mode. Takeover is unavailable because this MCP tool has no explicit write-authorization channel.",
           },
           current_hypothesis: { type: "string", description: "Current theory of the issue" },
           relevant_files: { type: "array", items: { type: "string" } },
@@ -27,6 +28,12 @@ export function createMcpToolDefinitions(broker: ConsultationBroker, registry: A
       },
       handler: async (toolInput: any) => {
         const mode = toolInput.mode ? ConsultationModeEnum.parse(toolInput.mode) : "consult";
+        if (mode === "takeover") {
+          throw new Error(
+            "policy_denied: MCP dad_consult does not expose an explicit write-authorization channel; takeover is unavailable"
+          );
+        }
+
         const request: ConsultationRequestInput = {
           mode,
           caller: { agent: "mcp-caller", role: "worker" },
