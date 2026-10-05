@@ -11,7 +11,7 @@
 |---|---|
 | Malicious project config in cloned repo | Project config is fail-closed: `.consult-dad/config.json` has no runtime authority unless its exact current contents match a `ConfigTrust` approval created by `dad trust`. New or modified project config is ignored and the runtime falls back to global or built-in defaults. |
 | Prompt/advisor content containing supported secret patterns | One shared `RedactionService` scrubs supported token/key/credential patterns for prompt construction and again at SQLite/artifact persistence sinks. |
-| Advisor writing files during consultation | `WorkspaceGuard` enforces `read_only: true` by default. |
+| Unauthorized write-enabled consultation | `EscalationPolicy` is enforced by `ConsultationBroker` before advisor resolution or persistence. Non-takeover modes cannot receive write authority, takeover requires an explicit write authorization signal, and MCP takeover fails closed because no such signal is exposed there. |
 | Directory traversal (`../../etc/passwd`) | `WorkspaceGuard` rejects non-workspace paths. |
 | Recursive runaway loops | `max_depth: 1` policy and `maxConsultationsPerTask: 3` cap. |
 
