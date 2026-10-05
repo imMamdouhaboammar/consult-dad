@@ -143,6 +143,88 @@ describe("Consult Dad CLI", () => {
     }
   });
 
+  it("attaches bounded source content from --file inside the configured workspace", async () => {
+    let capturedRequest: any = null;
+    const originalStart = fakeAdapter.start.bind(fakeAdapter);
+    fakeAdapter.start = async (request) => {
+      capturedRequest = request;
+      return originalStart(request);
+    };
+
+    const sampleFile = join(workspaceDir, "attached.ts");
+    writeFileSync(sampleFile, "export const attachedEvidence = 42;");
+
+    const cli = createCli({
+      store,
+      artifactStore,
+      registry,
+      broker,
+      configTrust: trust,
+      workspaceRoot: workspaceDir,
+    });
+
+    const originalLog = console.log;
+    console.log = () => {};
+
+    try {
+      await cli.parseAsync([
+        "node",
+        "dad",
+        "ask",
+        "--file",
+        "attached.ts",
+        "Review attached source",
+      ]);
+
+      expect(capturedRequest?.evidence?.relevant_files).toContain("attached.ts");
+      expect(capturedRequest?.evidence?.file_contents?.[0]?.path).toBe("attached.ts");
+      expect(capturedRequest?.evidence?.file_contents?.[0]?.content).toContain(
+        "attachedEvidence = 42"
+      );
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
+  it("rejects --log paths outside the configured workspace before consultation", async () => {
+    const outsideDir = join(tmpdir(), `test-cli-outside-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(outsideDir, { recursive: true });
+    const outsideLog = join(outsideDir, "outside.log");
+    writeFileSync(outsideLog, "outside workspace evidence");
+
+    const cli = createCli({
+      store,
+      artifactStore,
+      registry,
+      broker,
+      configTrust: trust,
+      workspaceRoot: workspaceDir,
+    });
+
+    const previousExitCode = process.exitCode;
+    const originalError = console.error;
+    console.error = () => {};
+    process.exitCode = 0;
+
+    try {
+      await cli.parseAsync([
+        "node",
+        "dad",
+        "ask",
+        "--log",
+        outsideLog,
+        "Read outside log",
+      ]);
+
+      expect(process.exitCode).toBe(1);
+      expect(broker.list()).toHaveLength(0);
+    } finally {
+      console.error = originalError;
+      process.exitCode = previousExitCode ?? 0;
+      rmSync(outsideDir, { recursive: true, force: true });
+    }
+  });
+
   it("executes ask command with file and test arguments", async () => {
     const cli = createCli({ store, artifactStore, registry, broker, configTrust: trust });
 
