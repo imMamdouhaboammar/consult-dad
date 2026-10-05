@@ -1,5 +1,6 @@
 import { ConsultationRequest } from "./protocol";
 import { PromptCompiler } from "../prompts/compiler";
+import { RedactionService } from "../security/redaction";
 
 export interface ContextPackOptions {
   maxCharacters?: number;
@@ -7,28 +8,10 @@ export interface ContextPackOptions {
   promptsDir?: string;
 }
 
-const SECRET_PATTERNS = [
-  /sk-[a-zA-Z0-9_-]{20,}/g, // OpenAI/Anthropic legacy keys
-  /sk-ant-[a-zA-Z0-9_-]{20,}/g, // Anthropic standard keys
-  /sk-proj-[a-zA-Z0-9_-]{20,}/g, // OpenAI project keys
-  /ghp_[a-zA-Z0-9]{30,}/g, // GitHub personal tokens
-  /gho_[a-zA-Z0-9]{30,}/g, // GitHub OAuth tokens
-  /ghu_[a-zA-Z0-9]{30,}/g, // GitHub user-to-server tokens
-  /ghs_[a-zA-Z0-9]{30,}/g, // GitHub server-to-server tokens
-  /glpat-[a-zA-Z0-9_-]{20,}/g, // GitLab tokens
-  /Bearer\s+[a-zA-Z0-9_\-\.]{20,}/gi, // Bearer auth headers / JWTs
-  /xox[baprs]-[0-9a-zA-Z]{10,}/g, // Slack tokens
-  /AKIA[0-9A-Z]{16}/g, // AWS Access Key ID
-  /AIza[0-9A-Za-z\\-_]{35}/g, // Google API Key
-  /postgres:\/\/[^:]+:[^@]+@[^\/]+/gi, // PostgreSQL credentials in URIs
-  /mysql:\/\/[^:]+:[^@]+@[^\/]+/gi, // MySQL credentials in URIs
-  /mongodb(\+srv)?:\/\/[^:]+:[^@]+@[^\/]+/gi, // Mongo credentials in URIs
-  /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g, // RSA/EC Private Keys
-];
-
 export class ContextPackBuilder {
   private options: ContextPackOptions;
   private compiler: PromptCompiler;
+  private redactor: RedactionService;
 
   constructor(options: ContextPackOptions = {}) {
     this.options = {
@@ -37,15 +20,11 @@ export class ContextPackBuilder {
       ...options,
     };
     this.compiler = new PromptCompiler({ promptsDir: this.options.promptsDir });
+    this.redactor = new RedactionService();
   }
 
   redact(text: string): string {
-    if (!text) return text;
-    let sanitized = text;
-    for (const pattern of SECRET_PATTERNS) {
-      sanitized = sanitized.replace(pattern, "[REDACTED]");
-    }
-    return sanitized;
+    return this.redactor.sanitizeText(text);
   }
 
   build(request: ConsultationRequest): string {

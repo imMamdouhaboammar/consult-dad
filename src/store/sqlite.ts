@@ -11,6 +11,7 @@ import {
 import { runMigrations } from "./migrations";
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
+import { RedactionService } from "../security/redaction";
 
 export interface ListFilter {
   status?: ConsultationStatus;
@@ -22,7 +23,10 @@ export interface ListFilter {
 export class ConsultationStore {
   private db: Database;
 
-  constructor(dbPath: string = ":memory:") {
+  constructor(
+    dbPath: string = ":memory:",
+    private redactor: RedactionService = new RedactionService()
+  ) {
     if (dbPath !== ":memory:") {
       mkdirSync(dirname(dbPath), { recursive: true });
     }
@@ -33,10 +37,11 @@ export class ConsultationStore {
   }
 
   create(request: ConsultationRequest, contextId?: string): string {
+    const safeRequest = this.redactor.sanitizeValue(request);
     const id = request.consultation_id || `dad_${ulid()}`;
     const startedAt = new Date().toISOString();
-    const callerId = request.caller.agent;
-    const mode = request.mode;
+    const callerId = safeRequest.caller.agent;
+    const mode = safeRequest.mode;
     const status: ConsultationStatus = "created";
 
     const query = this.db.prepare(`
@@ -55,7 +60,7 @@ export class ConsultationStore {
       mode,
       status,
       startedAt,
-      JSON.stringify(request)
+      JSON.stringify(safeRequest)
     );
 
     return id;
@@ -120,20 +125,22 @@ export class ConsultationStore {
   }
 
   saveAnswer(id: string, answer: ConsultationAnswer): void {
+    const safeAnswer = this.redactor.sanitizeValue(answer);
     this.db
       .prepare(
         `UPDATE consultations SET answer_json = ?, status = 'completed', finished_at = COALESCE(finished_at, ?) WHERE consultation_id = ?`
       )
-      .run(JSON.stringify(answer), new Date().toISOString(), id);
+      .run(JSON.stringify(safeAnswer), new Date().toISOString(), id);
   }
 
   appendEvent(id: string, type: string, detail?: string): void {
     const timestamp = new Date().toISOString();
+    const safeDetail = detail ? this.redactor.sanitizeText(detail) : undefined;
     this.db
       .prepare(
         `INSERT INTO consultation_events (consultation_id, timestamp, type, detail) VALUES (?, ?, ?, ?)`
       )
-      .run(id, timestamp, type, detail || null);
+      .run(id, timestamp, type, safeDetail || null);
   }
 
   recordArtifact(id: string, name: string, path: string): void {
