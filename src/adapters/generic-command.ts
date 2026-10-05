@@ -95,7 +95,7 @@ export class GenericCommandAdapter implements AdvisorAdapter {
   }
 
   private async executeProcess(consultationId: string, inputData: string): Promise<AdvisorRun> {
-    return new Promise<AdvisorRun>((resolve, reject) => {
+    return new Promise<AdvisorRun>((resolve) => {
       const child = spawn(this.command, this.args, {
         env: { ...process.env, ...this.env },
         stdio: ["pipe", "pipe", "pipe"],
@@ -105,17 +105,30 @@ export class GenericCommandAdapter implements AdvisorAdapter {
 
       let stdout = "";
       let stderr = "";
+      let stdinError: Error | null = null;
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
 
-      const timer = setTimeout(() => {
+      const finish = (run: AdvisorRun): void => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
+        this.childProcesses.delete(consultationId);
+        resolve(run);
+      };
+
+      const failedRun = (message: string): AdvisorRun => ({
+        consultation_id: consultationId,
+        advisor_id: this.id,
+        native_session_id: null,
+        status: "failed",
+        answer: null,
+        stderr: message,
+      });
+
+      timer = setTimeout(() => {
         child.kill("SIGKILL");
-        resolve({
-          consultation_id: consultationId,
-          advisor_id: this.id,
-          native_session_id: null,
-          status: "failed",
-          answer: null,
-          stderr: `Process timed out after ${this.timeoutMs}ms`,
-        });
+        finish(failedRun(`Process timed out after ${this.timeoutMs}ms`));
       }, this.timeoutMs);
 
       child.stdout.on("data", (chunk) => {
@@ -126,32 +139,27 @@ export class GenericCommandAdapter implements AdvisorAdapter {
         stderr += chunk.toString();
       });
 
+      child.stdin.on("error", (err: NodeJS.ErrnoException) => {
+        if (this.isBenignStdinClosure(err)) {
+          return;
+        }
+        stdinError = err;
+      });
+
       child.on("error", (err) => {
-        clearTimeout(timer);
-        this.childProcesses.delete(consultationId);
-        resolve({
-          consultation_id: consultationId,
-          advisor_id: this.id,
-          native_session_id: null,
-          status: "failed",
-          answer: null,
-          stderr: `Spawn error: ${err.message}`,
-        });
+        finish(failedRun(`Spawn error: ${err.message}`));
       });
 
       child.on("close", (code) => {
-        clearTimeout(timer);
-        this.childProcesses.delete(consultationId);
+        if (settled) return;
 
         if (code !== 0) {
-          resolve({
-            consultation_id: consultationId,
-            advisor_id: this.id,
-            native_session_id: null,
-            status: "failed",
-            answer: null,
-            stderr: stderr || `Process exited with code ${code}`,
-          });
+          finish(failedRun(stderr || `Process exited with code ${code}`));
+          return;
+        }
+
+        if (stdinError) {
+          finish(failedRun(`Stdin error: ${stdinError.message}`));
           return;
         }
 
@@ -163,7 +171,7 @@ export class GenericCommandAdapter implements AdvisorAdapter {
             ...parsed,
           });
 
-          resolve({
+          finish({
             consultation_id: consultationId,
             advisor_id: this.id,
             native_session_id: null,
@@ -173,7 +181,6 @@ export class GenericCommandAdapter implements AdvisorAdapter {
           });
         } catch (parseError: any) {
           console.error(`[consult-dad] GenericCommand answer parsing failed, using prose fallback: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-          // If stdout was prose, package it gracefully into standard answer schema
           const fallbackAnswer: ConsultationAnswer = {
             schema: "consult-dad.answer.v1",
             consultation_id: consultationId,
@@ -189,7 +196,7 @@ export class GenericCommandAdapter implements AdvisorAdapter {
             needs_followup: false,
           };
 
-          resolve({
+          finish({
             consultation_id: consultationId,
             advisor_id: this.id,
             native_session_id: null,
@@ -200,9 +207,23 @@ export class GenericCommandAdapter implements AdvisorAdapter {
         }
       });
 
-      child.stdin.write(inputData);
-      child.stdin.end();
+      try {
+        child.stdin.end(inputData);
+      } catch (err) {
+        const stdinWriteError = err as NodeJS.ErrnoException;
+        if (!this.isBenignStdinClosure(stdinWriteError)) {
+          stdinError = stdinWriteError;
+        }
+      }
     });
+  }
+
+  private isBenignStdinClosure(err: NodeJS.ErrnoException): boolean {
+    return (
+      err.code === "EPIPE" ||
+      err.code === "ECONNRESET" ||
+      err.code === "ERR_STREAM_DESTROYED"
+    );
   }
 
   private extractJson(text: string): any {
