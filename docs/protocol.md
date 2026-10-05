@@ -22,3 +22,13 @@ created ──► queued ──► running ◄──► input_required
 - `worker_action`: `"continue" | "retry" | "escalate" | "abort"`
 - `needs_followup`: `boolean`
 - `max_depth`: `1` (enforced at broker and escalation policy layer)
+
+
+## Write Authorization Policy
+
+The broker is the authoritative enforcement boundary for consultation write authority.
+
+- `consult`, `diagnose`, `review`, `decide`, and `challenge` are always read-only. A request that sets `constraints.read_only: false` in any of these modes is rejected before advisor resolution or persistence.
+- `takeover` is accepted only when the request explicitly carries `constraints.read_only: false`.
+- The CLI exposes that explicit authorization as `dad ask --mode takeover --allow-write ...`.
+- The MCP `dad_consult` tool has no write-authorization channel, so takeover is unavailable and fails closed.
