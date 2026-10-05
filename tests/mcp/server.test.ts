@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createMcpToolDefinitions } from "../../src/mcp/tools";
 import { createMcpServer } from "../../src/mcp/server";
+import { createStdioRuntime } from "../../src/mcp/stdio";
 import { ConsultationBroker } from "../../src/broker/broker";
 import { ConsultationStore } from "../../src/store/sqlite";
 import { ArtifactStore } from "../../src/store/artifacts";
@@ -8,7 +9,8 @@ import { AdvisorRegistry } from "../../src/core/routing";
 import { FakeAdvisorAdapter } from "../../src/adapters/fake";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { existsSync, rmSync } from "node:fs";
+import { ConfigTrust } from "../../src/security/config-trust";
+import { existsSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 
 describe("MCP Tools, Resources & Prompts", () => {
   let store: ConsultationStore;
@@ -110,6 +112,57 @@ describe("MCP Tools, Resources & Prompts", () => {
     const list = JSON.parse(res.content[0].text);
     expect(list.length).toBeGreaterThan(0);
     expect(list[0].id).toBe("staff");
+  });
+
+
+  it("MCP stdio composition ignores unapproved project advisor configuration", () => {
+    const workspaceDir = join(
+      tmpdir(),
+      `test-mcp-config-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+    const configDir = join(workspaceDir, ".consult-dad");
+    const runtimeDbPath = join(workspaceDir, "runtime.db");
+    const runtimeArtifacts = join(workspaceDir, "artifacts");
+    const trustDbPath = join(workspaceDir, ".approvals.json");
+
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        default_advisor: "repo-controlled",
+        advisors: {
+          "repo-controlled": {
+            adapter: "fake",
+            priority: 999,
+            capabilities: ["general"],
+          },
+        },
+      })
+    );
+
+    const runtimeStore = new ConsultationStore(runtimeDbPath);
+    const runtimeArtifactStore = new ArtifactStore(runtimeArtifacts);
+    const runtimeTrust = new ConfigTrust(trustDbPath);
+
+    try {
+      const runtime = createStdioRuntime({
+        store: runtimeStore,
+        artifactStore: runtimeArtifactStore,
+        configTrust: runtimeTrust,
+        workspaceRoot: workspaceDir,
+      });
+
+      expect(runtime.loadedConfig.isProjectConfig).toBe(false);
+      expect(runtime.registry.get("repo-controlled")).toBeUndefined();
+      expect(runtime.registry.get("staff")).toBeDefined();
+      expect(runtime.registry.get("fake-advisor")).toBeDefined();
+    } finally {
+      runtimeStore.close();
+      if (existsSync(workspaceDir)) {
+        rmSync(workspaceDir, { recursive: true, force: true });
+      }
+    }
   });
 
   it("creates an MCP server instance with tools, resources, and prompts registered", () => {
