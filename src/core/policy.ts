@@ -34,7 +34,7 @@ export class EscalationPolicy {
       };
     }
 
-    const writeAuthorized = request.constraints.read_only === false;
+    const writeAuthorized = request.constraints?.read_only === false;
 
     if (request.mode === "takeover") {
       if (!this.config.allowTakeover) {
