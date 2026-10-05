@@ -139,7 +139,7 @@ describe("Consult Dad CLI", () => {
       expect(broker.list()).toHaveLength(0);
     } finally {
       console.error = originalError;
-      process.exitCode = previousExitCode;
+      process.exitCode = previousExitCode ?? 0;
     }
   });
 
