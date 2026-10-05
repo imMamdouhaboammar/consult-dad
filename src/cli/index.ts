@@ -65,7 +65,8 @@ export function createCli(deps: CliDependencies = {}): Command {
     .description("Consult Dad — Local escalation bridge for AI coding agents")
     .version("0.0.1");
 
-  program.addCommand(createAskCommand(defaultBroker));
+  const workspaceRoot = deps.workspaceRoot || process.cwd();
+  program.addCommand(createAskCommand(defaultBroker, workspaceRoot));
   program.addCommand(createFollowupCommand(defaultBroker));
   program.addCommand(createStatusCommand(defaultBroker));
   program.addCommand(createResultCommand(defaultBroker));
