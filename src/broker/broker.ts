@@ -13,6 +13,7 @@ import {
 } from "../core/protocol";
 import { LifecycleStateMachine } from "./lifecycle";
 import { ConsultationQueue } from "./queue";
+import { EscalationPolicy } from "../core/policy";
 
 export interface BrokerOptions {
   store: ConsultationStore;
@@ -20,6 +21,7 @@ export interface BrokerOptions {
   defaultAdapter?: AdvisorAdapter;
   adapters?: Map<string, AdvisorAdapter>;
   registry?: AdvisorRegistry;
+  policy?: EscalationPolicy;
 }
 
 export class ConsultationBroker {
@@ -29,6 +31,7 @@ export class ConsultationBroker {
   private adapters: Map<string, AdvisorAdapter>;
   private registry?: AdvisorRegistry;
   private queue: ConsultationQueue;
+  private policy: EscalationPolicy;
   private activeRuns: Map<string, AdvisorRun> = new Map();
 
   constructor(options: BrokerOptions) {
@@ -41,6 +44,7 @@ export class ConsultationBroker {
       this.adapters.set(this.defaultAdapter.id, this.defaultAdapter);
     }
     this.queue = new ConsultationQueue();
+    this.policy = options.policy || new EscalationPolicy();
   }
 
   registerAdapter(adapter: AdvisorAdapter): void {
@@ -112,13 +116,9 @@ export class ConsultationBroker {
   ): Promise<string> {
     const request = ConsultationRequestSchema.parse(rawRequest);
 
-    // Enforce max_depth / prevent recursive consultations
-    if (
-      request.caller.role.toLowerCase().includes("dad") ||
-      request.caller.role.toLowerCase().includes("advisor") ||
-      request.caller.agent.toLowerCase().includes("dad")
-    ) {
-      throw new Error("policy_denied: Recursive Dad consultation forbidden (max_depth: 1)");
+    const policyResult = this.policy.validate(request);
+    if (!policyResult.allowed) {
+      throw new Error(policyResult.reason || "policy_denied: Consultation rejected by runtime policy");
     }
 
     const candidateAdapters = await this.resolveCandidatesForRequest(request, advisorId);
