@@ -1,4 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { WorkspaceGuard } from "../../src/security/workspace";
 import { EnvironmentCleaner } from "../../src/security/environment";
 
@@ -13,6 +16,24 @@ describe("WorkspaceGuard", () => {
   it("rejects path traversal attempts with ..", () => {
     expect(guard.isPathWithinWorkspace("../../etc/passwd")).toBe(false);
     expect(() => guard.assertPathWithinWorkspace("../outside.ts")).toThrow("workspace_violation");
+  });
+
+  it("rejects symlinks that escape the actual workspace root", () => {
+    const root = mkdtempSync(join(tmpdir(), "consult-dad-workspace-"));
+    const outside = mkdtempSync(join(tmpdir(), "consult-dad-outside-"));
+    mkdirSync(join(root, "src"), { recursive: true });
+    writeFileSync(join(outside, "secret.txt"), "outside");
+    symlinkSync(outside, join(root, "src", "escape"));
+
+    try {
+      const realGuard = new WorkspaceGuard(root);
+      expect(() =>
+        realGuard.assertPathWithinWorkspace("src/escape/secret.txt")
+      ).toThrow("workspace_violation");
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
+    }
   });
 
   it("enforces read-only constraint by default", () => {
