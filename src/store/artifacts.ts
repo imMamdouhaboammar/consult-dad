@@ -1,10 +1,14 @@
 import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync, rmSync } from "node:fs";
 import { join } from "node:path";
+import { RedactionService } from "../security/redaction";
 
 export class ArtifactStore {
   private baseDir: string;
 
-  constructor(baseDir: string = join(process.env.HOME || "", ".local/state/consult-dad/consultations")) {
+  constructor(
+    baseDir: string = join(process.env.HOME || "", ".local/state/consult-dad/consultations"),
+    private redactor: RedactionService = new RedactionService()
+  ) {
     this.baseDir = baseDir;
     mkdirSync(this.baseDir, { recursive: true });
   }
@@ -23,7 +27,8 @@ export class ArtifactStore {
   writeJson(id: string, filename: string, payload: unknown): string {
     const dir = this.initConsultation(id);
     const filePath = join(dir, filename);
-    writeFileSync(filePath, JSON.stringify(payload, null, 2), "utf-8");
+    const safePayload = this.redactor.sanitizeValue(payload);
+    writeFileSync(filePath, JSON.stringify(safePayload, null, 2), "utf-8");
     return filePath;
   }
 
@@ -40,14 +45,14 @@ export class ArtifactStore {
   writeText(id: string, filename: string, content: string): string {
     const dir = this.initConsultation(id);
     const filePath = join(dir, filename);
-    writeFileSync(filePath, content, "utf-8");
+    writeFileSync(filePath, this.redactor.sanitizeText(content), "utf-8");
     return filePath;
   }
 
   appendLog(id: string, filename: string, line: string): void {
     const dir = this.initConsultation(id);
     const filePath = join(dir, filename);
-    appendFileSync(filePath, line, "utf-8");
+    appendFileSync(filePath, this.redactor.sanitizeText(line), "utf-8");
   }
 
   readText(id: string, filename: string): string | null {
