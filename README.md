@@ -73,7 +73,8 @@ This generates `.consult-dad/config.json` with recommended defaults and approves
 ### 5. Consult Dad via CLI
 
 ```bash
-# General consultation with file attachments
+# General consultation with bounded file attachments
+# UTF-8 text only, workspace-contained, max 16 KiB per file / 48 KiB total evidence
 bun run dad ask -f src/auth/token.ts "Should we use database locks or optimistic concurrency for token refresh?"
 
 # Diagnostic mode with hypothesis and failing test
@@ -126,8 +127,9 @@ To attach Consult Dad directly to Claude Desktop, Cursor, or Gemini CLI:
 
 1. **Read-Only by Default**: Consultations never edit files or land commits without explicit `--allow-write` in `takeover` mode.
 2. **Cryptographic Config Trust**: Protects against malicious `.consult-dad/config.json` via SHA-256 approval tracking (`dad trust`).
-3. **Secret Redaction**: Automatically scrubs API tokens (OpenAI, Anthropic, GitHub, Slack, AWS, GCP, DB URIs, JWTs) from prompts and persisted artifacts.
-4. **Max Depth = 1**: Advisors cannot recursively consult other advisors, preventing runaway token loops.
+3. **Secret Redaction**: Automatically scrubs supported API-token and credential patterns from prompts and persisted artifacts.
+4. **Workspace-Contained Evidence**: `--file` and `--log` resolve real filesystem targets, reject symlink escapes, accept UTF-8 text only, and enforce 16 KiB per-file / 48 KiB total evidence budgets.
+5. **Max Depth = 1**: Advisors cannot recursively consult other advisors, preventing runaway token loops.
 
 ---
 
