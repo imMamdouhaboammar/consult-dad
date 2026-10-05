@@ -31,3 +31,6 @@ jobs:
 
       - name: Run test suite
         run: bun test
+
+      - name: Build and verify distribution packages
+        run: bun run package:verify
