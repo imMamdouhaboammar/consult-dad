@@ -66,6 +66,47 @@ describe("EscalationPolicy", () => {
     expect(check.reason).toContain("max_depth: 1");
   });
 
+  it("rejects write authorization outside takeover mode", () => {
+    const policy = new EscalationPolicy();
+    const check = policy.validate({
+      schema: "consult-dad.request.v1",
+      mode: "diagnose",
+      caller: { agent: "worker", role: "worker" },
+      goal: "Test",
+      question: "Test",
+      constraints: { read_only: false },
+      decision_needed: "Test",
+    });
+
+    expect(check.allowed).toBe(false);
+    expect(check.reason).toContain("only in takeover mode");
+  });
+
+  it("requires explicit write authorization for takeover", () => {
+    const policy = new EscalationPolicy();
+    const denied = policy.validate({
+      schema: "consult-dad.request.v1",
+      mode: "takeover",
+      caller: { agent: "worker", role: "worker" },
+      goal: "Test",
+      question: "Test",
+      constraints: { read_only: true },
+      decision_needed: "Test",
+    });
+    const allowed = policy.validate({
+      schema: "consult-dad.request.v1",
+      mode: "takeover",
+      caller: { agent: "worker", role: "worker" },
+      goal: "Test",
+      question: "Test",
+      constraints: { read_only: false },
+      decision_needed: "Test",
+    });
+
+    expect(denied.allowed).toBe(false);
+    expect(allowed.allowed).toBe(true);
+  });
+
   it("permits standard worker consultation requests", () => {
     const policy = new EscalationPolicy();
     const standardReq: ConsultationRequest = {
