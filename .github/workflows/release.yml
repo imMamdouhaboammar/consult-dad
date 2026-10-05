@@ -31,8 +31,8 @@ jobs:
           bun run lint
           bun test
 
-      - name: Build Distribution Packages
-        run: bun run package:dist
+      - name: Build and verify distribution packages
+        run: bun run package:verify
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
