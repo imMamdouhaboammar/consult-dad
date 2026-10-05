@@ -112,6 +112,33 @@ describe("Persistence redaction boundary", () => {
     expect(combined).toContain(REDACTED);
   });
 
+  it("does not persist a supported secret when it appears in an artifact object key", () => {
+    const id = "dad_redaction_key";
+    artifacts.writeJson(id, "key.json", {
+      [`credential-${SECRET}`]: "synthetic-value",
+    });
+
+    const persisted = artifacts.readText(id, "key.json") || "";
+    expect(persisted).not.toContain(SECRET);
+    expect(persisted).toContain("[REDACTED]");
+  });
+
+  it("redacts a supported multiline secret split across successive log appends", () => {
+    const id = "dad_split_log";
+    const begin = "-----BEGIN TEST PRIVATE KEY-----";
+    const end = "-----END TEST PRIVATE KEY-----";
+    const first = `${begin}\nsynthetic-part-one-`;
+    const second = `synthetic-part-two\n${end}\n`;
+
+    artifacts.appendLog(id, "stderr.log", first);
+    artifacts.appendLog(id, "stderr.log", second);
+
+    const persisted = artifacts.readLog(id, "stderr.log") || "";
+    expect(persisted).not.toContain("synthetic-part-one-");
+    expect(persisted).not.toContain("synthetic-part-two");
+    expect(persisted).toContain("[REDACTED]");
+  });
+
   it("keeps request and reflected advisor answer secrets out of broker durable state", async () => {
     const adapter = new FakeAdvisorAdapter({
       id: "reflecting-advisor",
