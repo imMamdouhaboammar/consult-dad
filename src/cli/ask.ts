@@ -2,7 +2,7 @@ import { Command } from "commander";
 import { ConsultationBroker } from "../broker/broker";
 import { ConsultationModeEnum, ConsultationRequestInput } from "../core/protocol";
 import { OutputFormatter } from "./output";
-import { existsSync, readFileSync } from "node:fs";
+import { EvidenceLoader } from "../security/evidence-loader";
 
 function collectArray(val: string, memo: string[] = []): string[] {
   if (val.includes(",")) {
@@ -13,7 +13,10 @@ function collectArray(val: string, memo: string[] = []): string[] {
   return memo;
 }
 
-export function createAskCommand(broker: ConsultationBroker): Command {
+export function createAskCommand(
+  broker: ConsultationBroker,
+  workspaceRoot: string = process.cwd()
+): Command {
   return new Command("ask")
     .description("Consult Dad on a technical decision, architecture question, or failure")
     .argument("<question>", "The specific question or decision needed")
@@ -21,11 +24,11 @@ export function createAskCommand(broker: ConsultationBroker): Command {
     .option("-a, --advisor <advisorId>", "Explicit advisor to consult")
     .option("-g, --goal <goal>", "Goal statement (defaults to question)")
     .option("--hypothesis <hypothesis>", "Current theory of why it is happening")
-    .option("-f, --file <file>", "Relevant file to include in context (can be repeated or comma-separated)", collectArray, [])
+    .option("-f, --file <file>", "UTF-8 source file to attach from the workspace (max 16 KiB each; can be repeated)", collectArray, [])
     .option("--diff", "Capture and attach uncommitted git diff", false)
     .option("--test <test>", "Failing test name or test file (can be repeated)", collectArray, [])
     .option("-e, --error <error>", "Specific error message encountered (can be repeated)", collectArray, [])
-    .option("--log <log>", "Log file to read and attach (can be repeated)", collectArray, [])
+    .option("--log <log>", "UTF-8 log file to attach from the workspace (max 16 KiB each; can be repeated)", collectArray, [])
     .option("--allow-write", "Allow write operations (permitted only in takeover mode)", false)
     .option("--json", "Output machine-readable JSON", false)
     .action(async (question: string, options: any) => {
@@ -41,21 +44,19 @@ export function createAskCommand(broker: ConsultationBroker): Command {
 
         const goal = options.goal || question;
 
-        const relevantFiles: string[] = Array.isArray(options.file) ? options.file : [];
+        const requestedFiles: string[] = Array.isArray(options.file) ? options.file : [];
+        const requestedLogs: string[] = Array.isArray(options.log) ? options.log : [];
         const failingTests: string[] = Array.isArray(options.test) ? options.test : [];
         const errors: string[] = Array.isArray(options.error) ? options.error : [];
 
-        const logs: string[] = [];
-        if (options.log && Array.isArray(options.log)) {
-          for (const logPath of options.log) {
-            if (existsSync(logPath)) {
-              try {
-                const content = readFileSync(logPath, "utf-8");
-                logs.push(`=== Log: ${logPath} ===\n${content.slice(0, 10000)}`);
-              } catch {}
-            }
-          }
-        }
+        const evidenceLoader = new EvidenceLoader(workspaceRoot);
+        const attachedFiles = evidenceLoader.load(requestedFiles);
+        const attachedLogs = evidenceLoader.load(requestedLogs);
+        const relevantFiles = attachedFiles.map((file) => file.path);
+        const logs = attachedLogs.map((log) => {
+          const truncation = log.truncated ? " [TRUNCATED]" : "";
+          return `=== Log: ${log.path}${truncation} ===\n${log.content}`;
+        });
 
         let gitDiff: string | null = null;
         if (options.diff) {
@@ -76,6 +77,7 @@ export function createAskCommand(broker: ConsultationBroker): Command {
           attempts: [],
           evidence: {
             relevant_files: relevantFiles,
+            file_contents: attachedFiles,
             failing_tests: failingTests,
             errors: errors,
             logs: logs,
@@ -83,7 +85,7 @@ export function createAskCommand(broker: ConsultationBroker): Command {
           },
           constraints: {
             read_only: !options.allowWrite,
-            workspace_root: process.cwd(),
+            workspace_root: workspaceRoot,
           },
           decision_needed: question,
         };

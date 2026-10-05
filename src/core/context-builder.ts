@@ -70,6 +70,7 @@ export class ContextPackBuilder {
       (request.evidence?.failing_tests && request.evidence.failing_tests.length > 0) ||
       (request.evidence?.errors && request.evidence.errors.length > 0) ||
       (request.evidence?.relevant_files && request.evidence.relevant_files.length > 0) ||
+      (request.evidence?.file_contents && request.evidence.file_contents.length > 0) ||
       request.evidence?.git_diff ||
       (request.evidence?.logs && request.evidence.logs.length > 0);
 
@@ -79,6 +80,16 @@ export class ContextPackBuilder {
       if (request.evidence?.relevant_files && request.evidence.relevant_files.length > 0) {
         lines.push("Relevant Files:");
         request.evidence.relevant_files.forEach((f) => lines.push(`- ${f}`));
+        lines.push("");
+      }
+
+      if (request.evidence?.file_contents && request.evidence.file_contents.length > 0) {
+        lines.push("Attached Source:");
+        request.evidence.file_contents.forEach((file) => {
+          const truncation = file.truncated ? " [TRUNCATED]" : "";
+          lines.push(`Attached File: ${this.redact(file.path)}${truncation}`);
+          lines.push(`\`\`\`text\n${this.redact(file.content)}\n\`\`\``);
+        });
         lines.push("");
       }
 

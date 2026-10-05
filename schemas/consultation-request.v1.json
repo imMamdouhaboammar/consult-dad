@@ -10,12 +10,22 @@
       "const": "consult-dad.request.v1"
     },
     "consultation_id": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "default": null
     },
     "mode": {
       "type": "string",
-      "enum": ["consult", "diagnose", "review", "decide", "challenge", "takeover"]
+      "enum": [
+        "consult",
+        "diagnose",
+        "review",
+        "decide",
+        "challenge",
+        "takeover"
+      ]
     },
     "caller": {
       "type": "object",
@@ -27,7 +37,10 @@
           "type": "string"
         }
       },
-      "required": ["agent", "role"],
+      "required": [
+        "agent",
+        "role"
+      ],
       "additionalProperties": false
     },
     "goal": {
@@ -53,7 +66,10 @@
             "type": "string"
           }
         },
-        "required": ["action", "outcome"],
+        "required": [
+          "action",
+          "outcome"
+        ],
         "additionalProperties": false
       },
       "default": []
@@ -63,26 +79,66 @@
       "properties": {
         "failing_tests": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": []
         },
         "errors": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": []
         },
         "relevant_files": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": []
         },
         "git_diff": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "default": null
         },
         "logs": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "file_contents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "content": {
+                "type": "string"
+              },
+              "truncated": {
+                "type": "boolean",
+                "default": false
+              },
+              "bytes_read": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "path",
+              "content"
+            ],
+            "additionalProperties": false
+          },
           "default": []
         }
       },

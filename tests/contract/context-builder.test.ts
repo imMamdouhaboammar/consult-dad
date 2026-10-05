@@ -51,6 +51,27 @@ describe("ContextPackBuilder", () => {
     expect(pack).toContain("Recommend the right locking or single-flight mechanism");
   });
 
+  it("renders attached source content with its file identity", () => {
+    const builder = new ContextPackBuilder();
+    const request: any = {
+      ...fullReq,
+      evidence: {
+        ...fullReq.evidence,
+        file_contents: [
+          {
+            path: "src/auth/refresh.ts",
+            content: "export const singleFlight = true;",
+            truncated: false,
+          },
+        ],
+      },
+    };
+
+    const pack = builder.build(request);
+    expect(pack).toContain("Attached File: src/auth/refresh.ts");
+    expect(pack).toContain("export const singleFlight = true;");
+  });
+
   it("redacts sensitive tokens, api keys, and bearer headers", () => {
     const builder = new ContextPackBuilder();
     const pack = builder.build(fullReq);
