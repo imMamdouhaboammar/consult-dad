@@ -12,21 +12,21 @@ export interface EscalationPolicyConfig {
 }
 
 export class EscalationPolicy {
-  private config: EscalationPolicyConfig;
+  private config: Required<EscalationPolicyConfig>;
 
   constructor(config: EscalationPolicyConfig = {}) {
     this.config = {
       maxDepth: 1,
       maxConsultationsPerTask: 3,
-      allowTakeover: false,
+      allowTakeover: true,
       ...config,
     };
   }
 
   validate(request: ConsultationRequest): PolicyValidationResult {
-    // 1. Enforce max_depth: 1 (Dad cannot consult Dad)
     const role = (request.caller.role || "").toLowerCase();
     const agent = (request.caller.agent || "").toLowerCase();
+
     if (role.includes("dad") || role.includes("advisor") || agent.includes("dad")) {
       return {
         allowed: false,
@@ -34,14 +34,31 @@ export class EscalationPolicy {
       };
     }
 
-    // 2. Takeover mode check
-    if (request.mode === "takeover" && !this.config.allowTakeover) {
-      if (request.constraints.read_only !== false) {
+    const writeAuthorized = request.constraints.read_only === false;
+
+    if (request.mode === "takeover") {
+      if (!this.config.allowTakeover) {
         return {
           allowed: false,
-          reason: "policy_denied: Takeover requires explicit write permissions (--allow-write)",
+          reason: "policy_denied: Takeover is disabled by runtime policy",
         };
       }
+
+      if (!writeAuthorized) {
+        return {
+          allowed: false,
+          reason: "policy_denied: Takeover requires explicit write authorization",
+        };
+      }
+
+      return { allowed: true };
+    }
+
+    if (writeAuthorized) {
+      return {
+        allowed: false,
+        reason: "policy_denied: Write authorization is valid only in takeover mode",
+      };
     }
 
     return { allowed: true };
