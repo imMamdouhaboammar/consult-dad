@@ -81,9 +81,22 @@ describe("Configuration Subsystem & ConfigTrust Integration", () => {
       configTrust: trust,
     });
 
-    const result = loader.load();
-    expect(result.isProjectConfig).toBe(false);
-    expect(result.config.default_advisor).toBe("global-safe");
+    let warning = "";
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      warning += args.join(" ") + "\n";
+    };
+
+    try {
+      const result = loader.load();
+      expect(result.isProjectConfig).toBe(false);
+      expect(result.config.default_advisor).toBe("global-safe");
+      expect(warning).toContain("dad trust");
+      expect(warning).not.toContain("repo-controlled");
+      expect(warning).not.toContain("priority");
+    } finally {
+      console.warn = originalWarn;
+    }
   });
 
   it("ignores a modified project config until it is re-approved", () => {
