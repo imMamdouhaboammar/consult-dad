@@ -70,7 +70,15 @@ export class EvidenceLoader {
       return null;
     }
 
-    const stat = statSync(canonicalPath);
+    let stat;
+    try {
+      stat = statSync(canonicalPath);
+    } catch {
+      throw new Error(
+        `evidence_file_unreadable: Evidence file '${requestedPath}' cannot be inspected`
+      );
+    }
+
     if (!stat.isFile()) {
       throw new Error(
         `evidence_file_invalid: Evidence path '${requestedPath}' is not a regular file`
@@ -91,13 +99,18 @@ export class EvidenceLoader {
     );
     const truncated = stat.size > bytesToRead;
     const buffer = Buffer.alloc(bytesToRead);
-    const fd = openSync(canonicalPath, "r");
-
+    let fd: number | null = null;
     let bytesRead = 0;
+
     try {
+      fd = openSync(canonicalPath, "r");
       bytesRead = readSync(fd, buffer, 0, bytesToRead, 0);
+    } catch {
+      throw new Error(
+        `evidence_file_unreadable: Evidence file '${requestedPath}' cannot be read`
+      );
     } finally {
-      closeSync(fd);
+      if (fd !== null) closeSync(fd);
     }
 
     const slice = buffer.subarray(0, bytesRead);
