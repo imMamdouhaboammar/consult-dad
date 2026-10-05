@@ -1,4 +1,13 @@
-import { resolve, normalize, relative } from "node:path";
+import {
+  existsSync,
+  realpathSync,
+} from "node:fs";
+import {
+  isAbsolute,
+  normalize,
+  relative,
+  resolve,
+} from "node:path";
 
 export class WorkspaceGuard {
   private workspaceRoot: string;
@@ -8,26 +17,56 @@ export class WorkspaceGuard {
   }
 
   isPathWithinWorkspace(targetPath: string): boolean {
-    const resolved = resolve(this.workspaceRoot, normalize(targetPath));
-    const rel = relative(this.workspaceRoot, resolved);
-    return !rel.startsWith("..") && !resolved.startsWith("/etc") && !resolved.startsWith("/private");
+    const root = this.canonicalWorkspaceRoot();
+    const target = this.canonicalTarget(targetPath);
+    const rel = relative(root, target);
+
+    return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
   }
 
   assertPathWithinWorkspace(targetPath: string): string {
-    const resolved = resolve(this.workspaceRoot, normalize(targetPath));
+    const target = this.canonicalTarget(targetPath);
     if (!this.isPathWithinWorkspace(targetPath)) {
-      throw new Error(`workspace_violation: Path '${targetPath}' is outside the authorized workspace root '${this.workspaceRoot}'`);
+      throw new Error(
+        `workspace_violation: Path '${targetPath}' resolves outside the authorized workspace root '${this.workspaceRoot}'`
+      );
     }
-    return resolved;
+    return target;
+  }
+
+  getCanonicalRoot(): string {
+    return this.canonicalWorkspaceRoot();
   }
 
   assertReadOnly(mode: string, allowWrite: boolean): void {
     if (mode === "takeover" && !allowWrite) {
-      throw new Error("workspace_violation: Takeover requires explicit write permission (--allow-write)");
+      throw new Error(
+        "workspace_violation: Takeover requires explicit write permission (--allow-write)"
+      );
     }
     if (mode !== "takeover" && allowWrite) {
-      // In non-takeover modes, writes are never permitted
-      throw new Error("workspace_violation: Read-only consultation cannot be converted to write without takeover mode");
+      throw new Error(
+        "workspace_violation: Read-only consultation cannot be converted to write without takeover mode"
+      );
     }
+  }
+
+  private canonicalWorkspaceRoot(): string {
+    if (existsSync(this.workspaceRoot)) {
+      return realpathSync(this.workspaceRoot);
+    }
+    return this.workspaceRoot;
+  }
+
+  private canonicalTarget(targetPath: string): string {
+    const lexical = isAbsolute(targetPath)
+      ? resolve(normalize(targetPath))
+      : resolve(this.workspaceRoot, normalize(targetPath));
+
+    if (existsSync(lexical)) {
+      return realpathSync(lexical);
+    }
+
+    return lexical;
   }
 }
