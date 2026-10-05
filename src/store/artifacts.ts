@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync, readFileSync, existsSync, appendFileSync, rmSync } from "node:fs";
+import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { RedactionService } from "../security/redaction";
 
@@ -52,7 +52,12 @@ export class ArtifactStore {
   appendLog(id: string, filename: string, line: string): void {
     const dir = this.initConsultation(id);
     const filePath = join(dir, filename);
-    appendFileSync(filePath, this.redactor.sanitizeText(line), "utf-8");
+    const existing = existsSync(filePath) ? readFileSync(filePath, "utf-8") : "";
+    writeFileSync(
+      filePath,
+      this.redactor.sanitizeText(existing + line),
+      "utf-8"
+    );
   }
 
   readText(id: string, filename: string): string | null {
