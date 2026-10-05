@@ -226,7 +226,14 @@ describe("Consult Dad CLI", () => {
   });
 
   it("executes ask command with file and test arguments", async () => {
-    const cli = createCli({ store, artifactStore, registry, broker, configTrust: trust });
+    const cli = createCli({
+      store,
+      artifactStore,
+      registry,
+      broker,
+      configTrust: trust,
+      workspaceRoot: workspaceDir,
+    });
 
     const sampleFile = join(workspaceDir, "mutex.ts");
     writeFileSync(sampleFile, "export class Mutex {}");
