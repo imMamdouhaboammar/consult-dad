@@ -5,7 +5,6 @@ import { ArtifactStore } from "../../src/store/artifacts";
 import { AdvisorRegistry } from "../../src/core/routing";
 import { FakeAdvisorAdapter } from "../../src/adapters/fake";
 import { GenericCommandAdapter } from "../../src/adapters/generic-command";
-import { WorkspaceGuard } from "../../src/security/workspace";
 import { ConfigTrust } from "../../src/security/config-trust";
 import { ContextPackBuilder } from "../../src/core/context-builder";
 import { EscalationPolicy } from "../../src/core/policy";
@@ -162,16 +161,28 @@ describe("Consult Dad — 12 Core Invariants", () => {
   });
 
   // Invariant 11: Takeover requires explicit write permission
-  it("Invariant 11: Takeover requires explicit write permission (--allow-write)", () => {
-    const guard = new WorkspaceGuard();
-    expect(() => guard.assertReadOnly("takeover", false)).toThrow("workspace_violation");
-    expect(() => guard.assertReadOnly("takeover", true)).not.toThrow();
+  it("Invariant 11: Broker rejects takeover without explicit write authorization", async () => {
+    await expect(
+      broker.consult({
+        ...baseReq,
+        mode: "takeover",
+        constraints: { read_only: true },
+      })
+    ).rejects.toThrow("policy_denied");
+
+    expect(broker.list()).toHaveLength(0);
   });
 
   // Invariant 12: Read-only consultation cannot be converted to write without takeover mode
-  it("Invariant 12: Non-takeover consultation cannot write files", () => {
-    const guard = new WorkspaceGuard();
-    expect(() => guard.assertReadOnly("consult", true)).toThrow("workspace_violation");
-    expect(() => guard.assertReadOnly("diagnose", true)).toThrow("workspace_violation");
+  it("Invariant 12: Broker rejects write authorization in non-takeover modes", async () => {
+    await expect(
+      broker.consult({
+        ...baseReq,
+        mode: "diagnose",
+        constraints: { read_only: false },
+      })
+    ).rejects.toThrow("policy_denied");
+
+    expect(broker.list()).toHaveLength(0);
   });
 });
