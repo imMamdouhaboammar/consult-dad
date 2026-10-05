@@ -32,7 +32,8 @@
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
     "dad": "bun run src/cli/index.ts",
-    "package:dist": "bun run scripts/package-dist.ts"
+    "package:dist": "bun run scripts/package-dist.ts",
+    "package:verify": "bun run package:dist && vitest run --config vitest.packaging.config.ts"
   },
   "keywords": [
     "ai",
