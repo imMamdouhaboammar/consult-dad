@@ -23,6 +23,27 @@ describe("RedactionService", () => {
     expect(sanitized.nested).not.toBe(input.nested);
   });
 
+  it("sanitizes secret-bearing object keys without losing colliding entries", () => {
+    const redactor = new RedactionService();
+    const secretA = SECRET;
+    const secretB = ["ghp_", "another", "synthetic", "credential", "fixture", "1234567890"].join("");
+    const input = {
+      [`token-${secretA}`]: "first",
+      [`token-${secretB}`]: "second",
+      safe: "third",
+    };
+
+    const sanitized = redactor.sanitizeValue(input);
+    const serialized = JSON.stringify(sanitized);
+    const keys = Object.keys(sanitized);
+
+    expect(serialized).not.toContain(secretA);
+    expect(serialized).not.toContain(secretB);
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(3);
+    expect(Object.values(sanitized).sort()).toEqual(["first", "second", "third"]);
+  });
+
   it("is idempotent for already-redacted content", () => {
     const redactor = new RedactionService();
     const once = redactor.sanitizeText(`token=${SECRET}`);
