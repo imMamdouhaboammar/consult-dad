@@ -186,6 +186,50 @@ describe("Consult Dad CLI", () => {
     }
   });
 
+  it("redacts attached source secrets before durable request storage", async () => {
+    const secret = ["ghp_", "attached", "source", "secret", "fixture", "12345678901234567890"].join("");
+    writeFileSync(
+      join(workspaceDir, "secret.ts"),
+      `export const token = "${secret}";`
+    );
+
+    const cli = createCli({
+      store,
+      artifactStore,
+      registry,
+      broker,
+      configTrust: trust,
+      workspaceRoot: workspaceDir,
+    });
+
+    const originalLog = console.log;
+    console.log = () => {};
+
+    try {
+      await cli.parseAsync([
+        "node",
+        "dad",
+        "ask",
+        "--file",
+        "secret.ts",
+        "Review secret-bearing source",
+      ]);
+
+      const [state] = broker.list({ limit: 1 });
+      const durableRequest = JSON.stringify(state.request);
+      expect(durableRequest).not.toContain(secret);
+      expect(durableRequest).toContain("[REDACTED]");
+
+      const artifactRequest = JSON.stringify(
+        artifactStore.readJson(state.consultation_id, "request.json")
+      );
+      expect(artifactRequest).not.toContain(secret);
+      expect(artifactRequest).toContain("[REDACTED]");
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
   it("rejects --log paths outside the configured workspace before consultation", async () => {
     const outsideDir = join(tmpdir(), `test-cli-outside-${Date.now()}-${Math.random().toString(36).slice(2)}`);
     mkdirSync(outsideDir, { recursive: true });
