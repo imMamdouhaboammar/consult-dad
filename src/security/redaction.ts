@@ -45,11 +45,29 @@ export class RedactionService {
     if (value !== null && typeof value === "object") {
       const sanitized: Record<string, unknown> = {};
       for (const [key, entry] of Object.entries(value)) {
-        sanitized[key] = this.sanitizeUnknown(entry);
+        const safeKey = this.allocateUniqueKey(this.sanitizeText(key), sanitized);
+        sanitized[safeKey] = this.sanitizeUnknown(entry);
       }
       return sanitized;
     }
 
     return value;
+  }
+
+  private allocateUniqueKey(
+    preferredKey: string,
+    target: Record<string, unknown>
+  ): string {
+    if (!(preferredKey in target)) {
+      return preferredKey;
+    }
+
+    let suffix = 2;
+    let candidate = `${preferredKey}#${suffix}`;
+    while (candidate in target) {
+      suffix += 1;
+      candidate = `${preferredKey}#${suffix}`;
+    }
+    return candidate;
   }
 }
