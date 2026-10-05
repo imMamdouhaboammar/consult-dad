@@ -33,6 +33,10 @@ export class ConfigTrust {
     }
 
     const content = readFileSync(configPath, "utf-8");
+    return this.checkContent(configPath, content);
+  }
+
+  checkContent(configPath: string, content: string): TrustCheckResult {
     const currentHash = this.computeHash(content);
     const approvals = this.loadApprovals();
 
