@@ -65,6 +65,22 @@ describe("EvidenceLoader", () => {
     expect(() => loader.load(["binary.bin"])).toThrow("evidence_file_binary");
   });
 
+  it("rejects invalid UTF-8 text with a stable encoding error", () => {
+    const root = makeWorkspace();
+    writeFileSync(join(root, "invalid.txt"), Buffer.from([0xc3, 0x28]));
+
+    const loader = new EvidenceLoader(root);
+    expect(() => loader.load(["invalid.txt"])).toThrow("evidence_file_encoding");
+  });
+
+  it("rejects directories as non-file evidence", () => {
+    const root = makeWorkspace();
+    mkdirSync(join(root, "folder"), { recursive: true });
+
+    const loader = new EvidenceLoader(root);
+    expect(() => loader.load(["folder"])).toThrow("evidence_file_invalid");
+  });
+
   it("truncates oversized files to the per-file byte budget", () => {
     const root = makeWorkspace();
     writeFileSync(join(root, "large.txt"), "abcdefghijklmnopqrstuvwxyz");
