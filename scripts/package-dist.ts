@@ -1,5 +1,5 @@
 #!/usr/bin/env bun
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { join, resolve } from "node:path";
@@ -10,7 +10,7 @@ const version = pkgJson.version || "0.0.1";
 const distDir = join(rootDir, "dist");
 const releaseDir = join(distDir, "release");
 
-console.log(`\n📦 Building Consult Dad Distribution Packages (v${version})...\n`);
+console.log(`\n📦 Building Consult Dad Distribution Packages (v${version})...\n`);\n\n// Always verify a freshly generated release set. Never reuse stale artifacts.\nif (existsSync(releaseDir)) {\n  rmSync(releaseDir, { recursive: true, force: true });\n}
 
 // 1. Ensure build is fresh
 console.log("🔨 1. Running build...");
