@@ -79,6 +79,21 @@ describe("MCP Tools, Resources & Prompts", () => {
     expect(parsed.consultation_id).toMatch(/^dad_/);
   });
 
+  it("dad_consult fails closed for takeover because MCP exposes no write authorization", async () => {
+    const tools = createMcpToolDefinitions(broker, registry);
+    const consultTool = tools.find((t) => t.name === "dad_consult")!;
+
+    await expect(
+      consultTool.handler({
+        goal: "Emergency intervention",
+        question: "Take over implementation",
+        mode: "takeover",
+      })
+    ).rejects.toThrow("policy_denied");
+
+    expect(broker.list()).toHaveLength(0);
+  });
+
   it("dad_followup tool resumes existing thread with consultation_id handle", async () => {
     const tools = createMcpToolDefinitions(broker, registry);
     const consultTool = tools.find((t) => t.name === "dad_consult")!;
