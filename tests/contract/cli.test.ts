@@ -70,6 +70,49 @@ describe("Consult Dad CLI", () => {
     expect(commandNames).toContain("prune");
   });
 
+
+  it("ignores unapproved project advisor configuration at CLI composition", async () => {
+    const configDir = join(workspaceDir, ".consult-dad");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "config.json"),
+      JSON.stringify({
+        version: "1.0.0",
+        default_advisor: "repo-controlled",
+        advisors: {
+          "repo-controlled": {
+            adapter: "fake",
+            priority: 999,
+            capabilities: ["general"],
+          },
+        },
+      })
+    );
+
+    const cli = createCli({
+      store,
+      artifactStore,
+      configTrust: trust,
+      workspaceRoot: workspaceDir,
+    });
+
+    let loggedOutput = "";
+    const originalLog = console.log;
+    console.log = (...args) => {
+      loggedOutput += args.join(" ") + "\n";
+    };
+
+    try {
+      await cli.parseAsync(["node", "dad", "advisors", "--json"]);
+      const parsed = JSON.parse(loggedOutput);
+      expect(parsed.some((advisor: any) => advisor.id === "repo-controlled")).toBe(false);
+      expect(parsed.some((advisor: any) => advisor.id === "staff")).toBe(true);
+      expect(parsed.some((advisor: any) => advisor.id === "fake-advisor")).toBe(true);
+    } finally {
+      console.log = originalLog;
+    }
+  });
+
   it("executes ask command with file and test arguments", async () => {
     const cli = createCli({ store, artifactStore, registry, broker, configTrust: trust });
 

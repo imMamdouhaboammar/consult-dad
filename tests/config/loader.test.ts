@@ -44,19 +44,29 @@ describe("Configuration Subsystem & ConfigTrust Integration", () => {
     expect(result.config.default_advisor).toBe("staff");
   });
 
-  it("detects and flags unapproved project config", () => {
+  it("fails closed on an unapproved project config by default", () => {
     const projectDir = join(testDir, "my-repo");
     const consultDadDir = join(projectDir, ".consult-dad");
     mkdirSync(consultDadDir, { recursive: true });
+
+    const globalConfigPath = join(testDir, "global-config.json");
+    writeFileSync(
+      globalConfigPath,
+      JSON.stringify({
+        version: "1.0.0",
+        default_advisor: "global-safe",
+        advisors: {},
+      })
+    );
 
     const configPath = join(consultDadDir, "config.json");
     writeFileSync(
       configPath,
       JSON.stringify({
         version: "1.0.0",
-        default_advisor: "custom-staff",
+        default_advisor: "repo-controlled",
         advisors: {
-          "custom-staff": {
+          "repo-controlled": {
             adapter: "fake",
             priority: 200,
           },
@@ -67,12 +77,72 @@ describe("Configuration Subsystem & ConfigTrust Integration", () => {
     const trust = new ConfigTrust(trustDbPath);
     const loader = new ConfigLoader({
       workspaceRoot: projectDir,
+      globalConfigPath,
       configTrust: trust,
-      strictTrust: true,
+    });
+
+    let warning = "";
+    const originalWarn = console.warn;
+    console.warn = (...args) => {
+      warning += args.join(" ") + "\n";
+    };
+
+    try {
+      const result = loader.load();
+      expect(result.isProjectConfig).toBe(false);
+      expect(result.config.default_advisor).toBe("global-safe");
+      expect(warning).toContain("dad trust");
+      expect(warning).not.toContain("repo-controlled");
+      expect(warning).not.toContain("priority");
+    } finally {
+      console.warn = originalWarn;
+    }
+  });
+
+  it("ignores a modified project config until it is re-approved", () => {
+    const projectDir = join(testDir, "modified-repo");
+    const consultDadDir = join(projectDir, ".consult-dad");
+    mkdirSync(consultDadDir, { recursive: true });
+
+    const configPath = join(consultDadDir, "config.json");
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        version: "1.0.0",
+        default_advisor: "approved-advisor",
+        advisors: {
+          "approved-advisor": {
+            adapter: "fake",
+            priority: 150,
+          },
+        },
+      })
+    );
+
+    const trust = new ConfigTrust(trustDbPath);
+    trust.approve(configPath);
+
+    writeFileSync(
+      configPath,
+      JSON.stringify({
+        version: "1.0.0",
+        default_advisor: "modified-advisor",
+        advisors: {
+          "modified-advisor": {
+            adapter: "fake",
+            priority: 999,
+          },
+        },
+      })
+    );
+
+    const loader = new ConfigLoader({
+      workspaceRoot: projectDir,
+      globalConfigPath: join(testDir, "missing-global.json"),
+      configTrust: trust,
     });
 
     const result = loader.load();
-    // In strictTrust mode, unapproved config is skipped
     expect(result.isProjectConfig).toBe(false);
     expect(result.config.default_advisor).toBe("staff");
   });
@@ -104,7 +174,6 @@ describe("Configuration Subsystem & ConfigTrust Integration", () => {
     const loader = new ConfigLoader({
       workspaceRoot: projectDir,
       configTrust: trust,
-      strictTrust: true,
     });
 
     const result = loader.load();

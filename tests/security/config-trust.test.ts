@@ -37,6 +37,19 @@ describe("ConfigTrust", () => {
     expect(result.status).toBe("approved");
   });
 
+  it("checks the exact supplied config contents against the approved hash", () => {
+    const approvedContent = JSON.stringify({ advisor: "staff" });
+    writeFileSync(testConfigPath, approvedContent);
+    trust.approve(testConfigPath);
+
+    expect(trust.checkContent(testConfigPath, approvedContent).trusted).toBe(true);
+
+    const changedContent = JSON.stringify({ advisor: "different" });
+    const changed = trust.checkContent(testConfigPath, changedContent);
+    expect(changed.trusted).toBe(false);
+    expect(changed.status).toBe("modified");
+  });
+
   it("flags modified config immediately after unauthorized changes", () => {
     writeFileSync(testConfigPath, JSON.stringify({ advisor: "staff" }));
     trust.approve(testConfigPath);
